@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+screenshot_*.png
+test_e2e.py
+.DS_Store
+Thumbs.db
+.netlify/

@@ -1,0 +1,18 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/save-colony"
+  to = "/.netlify/functions/save-colony"
+  status = 200
+
+[[redirects]]
+  from = "/api/save-colonies-bulk"
+  to = "/.netlify/functions/save-colonies-bulk"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
