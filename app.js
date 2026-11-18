@@ -1,1487 +1,1784 @@
 /**
- * NeoGeo GHMC Colony Survey & GIS Delivery Dashboard
- * Integration Engine & Deduplication System with Animated Counters & Admin Authentication
+ * NeoGeo — GHMC Project Colony Performance Management Dashboard
+ * Live Two-Way Google Sheets Integration (Dashboard + Admin Suite)
+ *
+ * Linked Sheet: https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit?usp=sharing
  */
 
-// Application State
-const state = {
-  activeSource: 'fresh',
-  activeView: 'overview',
-  colonyDataMode: 'dedup', // 'dedup' or 'raw'
-  colonyStatusFilter: 'ALL',
-  colonySearchTerm: '',
-  circleSearchTerm: '',
-  wardSearchTerm: '',
-  dateFilterTerm: '',
-  isAuthenticated: false,
-  currentUser: null,
-  chartTimelineInstance: null,
-  chartCircleInstance: null,
-  data: null
-};
+(function () {
+  'use strict';
 
-// Initialize App
-document.addEventListener('DOMContentLoaded', () => {
-  checkAuthSession();
-  loadInitialData();
-  setupEventListeners();
-  renderAllViews();
-  animateCounters();
-  updateClock();
-  setInterval(updateClock, 60000);
-});
+  const CONFIG = {
+    sheetId: '1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE',
+    sheetName: 'COLONIES',
+    sheetUrl: 'https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit?usp=sharing',
+    apiEndpoint: '/api/sheet-sync',
+    autoSyncMs: 30000,
+    storageKeys: {
+      scriptUrl: 'GHMC_APPS_SCRIPT_URL_V2',
+      adminCreds: 'GHMC_ADMIN_CREDS_V2',
+      adminSession: 'GHMC_ADMIN_SESSION_V2',
+      pendingEdits: 'GHMC_PENDING_EDITS_V2'
+    }
+  };
 
-// Authentication Session Checker (Always requires login every time page is refreshed)
-function checkAuthSession() {
-  localStorage.removeItem('GHMC_ADMIN_AUTH');
-  sessionStorage.removeItem('GHMC_ADMIN_AUTH');
-  state.isAuthenticated = false;
-  state.currentUser = null;
-  updateAuthUI();
+  const state = {
+    allColonies: [],
+    activeSource: 'fresh', // fresh | resubmit | layers
+    activeView: 'overview', // overview | month | week | date | circle | admin
+    activeAdminSubTab: 'colonies', // colonies | sync
+    isAuthenticated: false,
+    adminUser: 'Admin',
+    scriptUrl: localStorage.getItem(CONFIG.storageKeys.scriptUrl) || '',
+    envWriteConfigured: false,
+    syncMode: 'snapshot', // apps-script | gviz-csv | snapshot
+    lastSyncedAt: null,
+    autoSyncTimer: null,
+    adminSort: { key: 'row', dir: 'desc' },
+    adminFilters: { search: '', status: 'ALL', circle: 'ALL' },
+    dateWiseSelected: 'LATEST',
+    circleSearch: '',
+    circleFilter: 'ALL',
+    selectedDrilldownCircle: null,
+    pendingEdits: loadPendingEdits(),
+    charts: {
+      daily: null,
+      circle: null,
+      month: null,
+      week: null
+    }
+  };
+
+  const APPS_SCRIPT_SNIPPET = `var SPREADSHEET_ID = '${CONFIG.sheetId}';
+var SHEET_NAME = '${CONFIG.sheetName}';
+
+function getColoniesSheet() {
+  return SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
 }
 
-// Update Auth UI Elements
-function updateAuthUI() {
-  const badge = document.getElementById('adminAuthBadge');
-  const badgeText = document.getElementById('authBadgeText');
-  const lockIcon = document.getElementById('authLockIcon');
-  const avatar = document.getElementById('userAvatarBtn');
-  const avatarInitials = document.getElementById('avatarInitials');
-  const subNavStatus = document.getElementById('adminSubNavStatus');
-  const lockedState = document.getElementById('adminLockedState');
-  const unlockedState = document.getElementById('adminUnlockedState');
+function formatDateCell(val) {
+  if (!val) return '';
+  if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val.getTime())) {
+    return Utilities.formatDate(val, Session.getScriptTimeZone() || 'Asia/Kolkata', 'yyyy-MM-dd');
+  }
+  return String(val).trim();
+}
 
-  if (state.isAuthenticated) {
-    if (badgeText) badgeText.textContent = `${state.currentUser} (Admin)`;
-    if (lockIcon) lockIcon.className = 'fa-solid fa-shield-check text-emerald-400';
-    if (avatar) {
-      avatar.classList.add('logged-in');
-      avatar.title = `Logged in as ${state.currentUser} (Click to Logout)`;
+function parseDateInput(str) {
+  if (!str) return '';
+  var s = String(str).trim();
+  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(s)) {
+    var p = s.split('-');
+    return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  }
+  return s;
+}
+
+function parseNumeric(val) {
+  if (val === null || val === undefined) return 0;
+  var s = String(val).trim();
+  if (!s || s === '-' || s === 'None') return 0;
+  if (s === '199343' || s === '199343.0') return 542;
+  if (s.indexOf('(') !== -1) {
+    var m1 = s.split('(')[0].match(/\\d+/);
+    return m1 ? parseInt(m1[0], 10) : 0;
+  }
+  if (s.indexOf(',') !== -1) {
+    var parts = s.match(/\\d+/g);
+    if (parts) {
+      var sum = 0;
+      for (var i = 0; i < parts.length; i++) sum += parseInt(parts[i], 10);
+      return sum;
     }
-    if (avatarInitials) avatarInitials.textContent = state.currentUser.charAt(0).toUpperCase();
-    if (subNavStatus) subNavStatus.textContent = 'Unlocked & Active';
-    if (lockedState) lockedState.style.display = 'none';
-    if (unlockedState) unlockedState.style.display = 'block';
-  } else {
-    if (badgeText) badgeText.textContent = 'Admin Login';
-    if (lockIcon) lockIcon.className = 'fa-solid fa-lock text-slate-300';
-    if (avatar) {
-      avatar.classList.remove('logged-in');
-      avatar.title = 'Click to Log In';
+  }
+  var n = Number(s);
+  return isNaN(n) ? 0 : Math.round(n);
+}
+
+function normalizeCell(v) {
+  if (v === null || v === undefined) return '';
+  var s = String(v).trim();
+  if (s === '') return '';
+  return /^\\d+$/.test(s) ? Number(s) : s;
+}
+
+function jsonOut(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+  try {
+    if (e && e.parameter && e.parameter.action === 'ping') {
+      return jsonOut({ ok: true, connected: true, sheetName: SHEET_NAME });
     }
-    if (avatarInitials) avatarInitials.textContent = 'JM';
-    if (subNavStatus) subNavStatus.textContent = 'Protected Suite';
-    if (lockedState) lockedState.style.display = 'block';
-    if (unlockedState) unlockedState.style.display = 'none';
+    var sheet = getColoniesSheet();
+    var lastRow = sheet.getLastRow();
+    var values = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 9).getValues() : [];
+    var colonies = [];
+    for (var i = 0; i < values.length; i++) {
+      var r = values[i];
+      var hasData = false;
+      for (var c = 1; c < 9; c++) {
+        if (r[c] !== null && r[c] !== undefined && String(r[c]).trim() !== '') { hasData = true; break; }
+      }
+      if (!hasData) continue;
+      colonies.push({
+        row: i + 2,
+        sno: r[0] != null ? String(r[0]).trim() : '',
+        circle: r[1] != null ? String(r[1]).trim() : '',
+        ward: r[2] != null ? String(r[2]).trim() : '',
+        colony: r[3] != null ? String(r[3]).trim() : '',
+        date: formatDateCell(r[4]),
+        status: (r[5] != null ? String(r[5]).trim().toUpperCase() : '') || 'HOLD',
+        dashboardRaw: r[6] != null ? String(r[6]).trim() : '',
+        finalRaw: r[7] != null ? String(r[7]).trim() : '',
+        dashboardCount: parseNumeric(r[6]),
+        finalCount: parseNumeric(r[7]),
+        reason: r[8] != null ? String(r[8]).trim() : ''
+      });
+    }
+    return jsonOut({ ok: true, source: 'apps-script', count: colonies.length, updatedAt: new Date().toISOString(), colonies: colonies });
+  } catch (err) {
+    return jsonOut({ ok: false, error: err.message });
   }
 }
 
-// Load Initial Data (LocalStorage or data.js)
-function loadInitialData() {
-  const saved = localStorage.getItem('GHMC_DASHBOARD_STATE_COLONIES');
-  if (saved) {
+function findNextEmptyRow(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { row: 2, sno: 1 };
+  var values = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
+  var maxSno = 0;
+  for (var i = 0; i < values.length; i++) {
+    var r = values[i];
+    var hasData = false;
+    for (var c = 1; c < 9; c++) {
+      if (r[c] !== null && r[c] !== undefined && String(r[c]).trim() !== '') { hasData = true; break; }
+    }
+    if (hasData) {
+      var n = parseInt(String(r[0] || ''), 10);
+      if (!isNaN(n) && n > maxSno) maxSno = n;
+    } else {
+      return { row: i + 2, sno: r[0] ? r[0] : maxSno + 1 };
+    }
+  }
+  return { row: lastRow + 1, sno: maxSno + 1 };
+}
+
+function applyUpdate(sheet, d) {
+  var rowNum = parseInt(d.row, 10);
+  var ex = sheet.getRange(rowNum, 1, 1, 9).getValues()[0];
+  var upd = [
+    d.sno !== undefined && d.sno !== '' ? normalizeCell(d.sno) : ex[0],
+    d.circle !== undefined ? String(d.circle).trim() : ex[1],
+    d.ward !== undefined ? String(d.ward).trim() : ex[2],
+    d.colony !== undefined ? String(d.colony).trim() : ex[3],
+    d.date !== undefined && d.date !== '' ? parseDateInput(d.date) : ex[4],
+    d.status !== undefined ? String(d.status).trim().toUpperCase() : ex[5],
+    d.dashboardCount !== undefined ? normalizeCell(d.dashboardCount) : ex[6],
+    d.finalCount !== undefined ? normalizeCell(d.finalCount) : ex[7],
+    d.reason !== undefined ? String(d.reason).trim() : ex[8]
+  ];
+  sheet.getRange(rowNum, 1, 1, 9).setValues([upd]);
+  if (upd[4] instanceof Date) sheet.getRange(rowNum, 5).setNumberFormat('dd-mmm-yyyy');
+  return rowNum;
+}
+
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var body = JSON.parse((e && e.postData && e.postData.contents) ? e.postData.contents : '{}');
+    var sheet = getColoniesSheet();
+    if (body.action === 'ping') return jsonOut({ ok: true, connected: true, sheetName: SHEET_NAME });
+    if (body.action === 'updateRow') {
+      var r = applyUpdate(sheet, body.data || body);
+      SpreadsheetApp.flush();
+      return jsonOut({ ok: true, row: r, message: 'Row #' + r + ' updated in Google Sheet.' });
+    }
+    if (body.action === 'addRow') {
+      var d = body.data || body;
+      var slot = findNextEmptyRow(sheet);
+      var vals = [slot.sno, String(d.circle || '').trim(), String(d.ward || '').trim(), String(d.colony || '').trim(), parseDateInput(d.date), String(d.status || 'PROGRESS').trim().toUpperCase(), normalizeCell(d.dashboardCount), normalizeCell(d.finalCount), String(d.reason || '').trim()];
+      sheet.getRange(slot.row, 1, 1, 9).setValues([vals]);
+      if (vals[4] instanceof Date) sheet.getRange(slot.row, 5).setNumberFormat('dd-mmm-yyyy');
+      SpreadsheetApp.flush();
+      return jsonOut({ ok: true, row: slot.row, sno: String(slot.sno), message: 'Added at Row #' + slot.row });
+    }
+    if (body.action === 'bulkUpdate') {
+      var items = body.items || [];
+      for (var i = 0; i < items.length; i++) applyUpdate(sheet, items[i]);
+      SpreadsheetApp.flush();
+      return jsonOut({ ok: true, count: items.length, message: items.length + ' rows synced to Google Sheet.' });
+    }
+    return jsonOut({ ok: false, error: 'Unknown action' });
+  } catch (err) {
+    return jsonOut({ ok: false, error: err.message });
+  } finally {
+    lock.releaseLock();
+  }
+}`;
+
+  /* ==========================================================================
+     Utility Helpers
+     ========================================================================== */
+
+  function loadPendingEdits() {
     try {
-      state.data = JSON.parse(saved);
-      showToast('Loaded saved workspace data from LocalStorage', 'info');
-    } catch (e) {
-      console.error('Failed to parse localStorage data:', e);
-      state.data = JSON.parse(JSON.stringify(window.GHMC_DATA));
+      const raw = localStorage.getItem(CONFIG.storageKeys.pendingEdits);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
     }
-  } else if (window.GHMC_DATA) {
-    state.data = JSON.parse(JSON.stringify(window.GHMC_DATA));
-  } else {
-    console.error('window.GHMC_DATA not found');
   }
 
-  recalculateDeduplication();
-}
-
-// Helper to parse numbers safely
-function parseNum(v) {
-  if (v === null || v === undefined) return 0;
-  const s = String(v).trim();
-  if (s === '' || s === '-' || s === 'None') return 0;
-  if (s === '199343') return 199; // Fix historical typo in excel row 125
-  const matches = s.match(/\d+/g);
-  if (matches) {
-    return matches.reduce((acc, curr) => {
-      const n = parseInt(curr, 10);
-      return acc + (n > 50000 ? 199 : n);
-    }, 0);
+  function savePendingEdits() {
+    localStorage.setItem(CONFIG.storageKeys.pendingEdits, JSON.stringify(state.pendingEdits));
   }
-  return 0;
-}
 
-// Recalculate Deduplication and Circle Metrics
-function recalculateDeduplication() {
-  if (!state.data || !state.data.colonies_raw) return;
+  function formatIndianNumber(n) {
+    const num = Number(n) || 0;
+    return num.toLocaleString('en-IN');
+  }
 
-  const raw = state.data.colonies_raw;
-  const groups = {};
+  function escapeHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
-  raw.forEach(item => {
-    const c = (item.circle || '').trim().toUpperCase();
-    const w = (item.ward || '').trim().toUpperCase();
-    const col = (item.colony || '').trim().toUpperCase();
-
-    if (col === '-' || col === '' || col === 'NONE') {
-      groups[`_ANON_${item.id}`] = [item];
-    } else {
-      const key = `${c}___${w}___${col}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(item);
+  function parseNumeric(val) {
+    if (val === null || val === undefined) return 0;
+    const s = String(val).trim();
+    if (!s || s === '-' || s === 'None' || s === 'N/A') return 0;
+    if (s === '199343' || s === '199343.0') return 542;
+    if (s.includes('(')) {
+      const m = s.split('(')[0].match(/\d+/);
+      return m ? parseInt(m[0], 10) : 0;
     }
-  });
-
-  const duplicateGroups = [];
-  const deduped = [];
-
-  Object.entries(groups).forEach(([key, items]) => {
-    if (items.length > 1 && !key.startsWith('_ANON_')) {
-      duplicateGroups.push({
-        group_key: key,
-        colony_name: items[0].colony,
-        circle: items[0].circle,
-        ward: items[0].ward,
-        occurrence_count: items.length,
-        items: items
-      });
-
-      const sorted = [...items].sort((a, b) => {
-        const da = a.alloted_date || '1970-01-01';
-        const db = b.alloted_date || '1970-01-01';
-        if (da !== db) return db.localeCompare(da);
-        const sa = (a.status || '').toUpperCase() === 'COMPLETED' ? 2 : ((a.status || '').toUpperCase() === 'PROGRESS' ? 1 : 0);
-        const sb = (b.status || '').toUpperCase() === 'COMPLETED' ? 2 : ((b.status || '').toUpperCase() === 'PROGRESS' ? 1 : 0);
-        return sb - sa;
-      });
-
-      const best = { ...sorted[0], is_deduplicated: true, duplicates_merged: items.length };
-      deduped.push(best);
-    } else {
-      deduped.push({ ...items[0], is_deduplicated: false, duplicates_merged: 1 });
+    if (s.includes(',')) {
+      const parts = s.match(/\d+/g);
+      return parts ? parts.reduce((a, b) => a + parseInt(b, 10), 0) : 0;
     }
-  });
+    const n = Number(s);
+    if (!Number.isNaN(n)) return Math.round(n);
+    const m = s.match(/\d+/);
+    return m ? parseInt(m[0], 10) : 0;
+  }
 
-  state.data.duplicate_groups = duplicateGroups;
-  state.data.colonies_deduped = deduped;
+  function normalizeCircleKey(circle) {
+    const raw = String(circle || '').trim().toUpperCase();
+    if (!raw || raw === '-') return 'UNASSIGNED';
+    return raw
+      .replace(/\s+/g, ' ')
+      .replace('21-CHANDA NAGAR', '21-CHANDANAGAR')
+      .replace('3-HAYAT NAGAR', '3-HAYATNAGAR');
+  }
 
-  // Recalculate Circle Metrics from deduped colonies
-  const circleMap = {};
-  let compCount = 0;
-  let holdCount = 0;
-  let progCount = 0;
-  let dashPropsTotal = 0;
-  let finalPropsTotal = 0;
+  function formatDisplayDate(isoDate) {
+    if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate || '—';
+    const [y, m, d] = isoDate.split('-').map(Number);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${String(d).padStart(2, '0')}-${months[m - 1]}-${y}`;
+  }
 
-  deduped.forEach(c => {
-    const cName = c.circle || '-';
-    const status = (c.status || '').toUpperCase();
-    const dProps = parseNum(c.dashboard_count);
-    const fProps = parseNum(c.final_count);
+  function formatShortDate(isoDate) {
+    if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate || '';
+    const [, m, d] = isoDate.split('-').map(Number);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${String(d).padStart(2, '0')} ${months[m - 1]}`;
+  }
 
-    dashPropsTotal += dProps;
-    finalPropsTotal += fProps;
+  function formatMonthLabel(ym) {
+    if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return ym || 'Unknown';
+    const [y, m] = ym.split('-').map(Number);
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return `${months[m - 1]} ${y}`;
+  }
 
-    if (status.includes('COMPLETED')) compCount++;
-    else if (status.includes('HOLD')) holdCount++;
-    else progCount++;
+  function getWeekStart(isoDate) {
+    if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return '';
+    const [y, m, d] = isoDate.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    const day = dt.getDay();
+    const diff = day === 0 ? -6 : 1 - day; // Monday start
+    dt.setDate(dt.getDate() + diff);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  }
 
-    if (cName !== '-' && cName !== '') {
-      if (!circleMap[cName]) {
-        circleMap[cName] = {
-          circle: cName,
-          total_colonies: 0,
+  function addDays(isoDate, days) {
+    const [y, m, d] = isoDate.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + days);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  }
+
+  function parseCSV(text) {
+    const rows = [];
+    let row = [];
+    let field = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      const next = text[i + 1];
+      if (inQuotes) {
+        if (ch === '"' && next === '"') {
+          field += '"';
+          i++;
+        } else if (ch === '"') {
+          inQuotes = false;
+        } else {
+          field += ch;
+        }
+      } else {
+        if (ch === '"') inQuotes = true;
+        else if (ch === ',') { row.push(field); field = ''; }
+        else if (ch === '\r' && next === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; }
+        else if (ch === '\n' || ch === '\r') { row.push(field); rows.push(row); row = []; field = ''; }
+        else field += ch;
+      }
+    }
+    if (field.length > 0 || row.length > 0) {
+      row.push(field);
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function normalizeCsvDate(raw) {
+    if (!raw) return '';
+    const s = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const dmyMon = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{2,4})$/);
+    if (dmyMon) {
+      const months = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+      const mon = months[dmyMon[2].slice(0, 3).toLowerCase()];
+      if (mon) {
+        const y = dmyMon[3].length === 2 ? `20${dmyMon[3]}` : dmyMon[3];
+        return `${y}-${String(mon).padStart(2, '0')}-${String(dmyMon[1]).padStart(2, '0')}`;
+      }
+    }
+    const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slash) {
+      const a = parseInt(slash[1], 10);
+      const b = parseInt(slash[2], 10);
+      const m = a > 12 ? b : a;
+      const d = a > 12 ? a : b;
+      return `${slash[3]}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+    const dt = new Date(s);
+    if (!Number.isNaN(dt.getTime())) {
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    }
+    return s;
+  }
+
+  function showToast(msg, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    const icon = type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-exclamation' : type === 'warn' ? 'fa-triangle-exclamation' : 'fa-circle-info';
+    el.innerHTML = `<i class="fa-solid ${icon}"></i><span>${escapeHtml(msg)}</span>`;
+    container.appendChild(el);
+    setTimeout(() => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(14px)';
+      el.style.transition = 'all 0.25s ease';
+      setTimeout(() => el.remove(), 260);
+    }, 4200);
+  }
+
+  /* ==========================================================================
+     Data Filtering by Primary Stream (Fresh / Resubmit / 3Layers)
+     ========================================================================== */
+
+  function filterBySource(records, source) {
+    if (source === 'resubmit') {
+      return records.filter((r) => {
+        const st = (r.status || '').toUpperCase();
+        const rs = (r.reason || '').toLowerCase();
+        return st === 'HOLD' || st === 'PROGRESS' || st === 'REJECTED' ||
+          rs.includes('reject') || rs.includes('resurvey') || rs.includes('field') || rs.includes('qa');
+      });
+    }
+    if (source === 'layers') {
+      return records.filter((r) => {
+        const rs = (r.reason || '').toLowerCase();
+        return rs.includes('layer') || rs.includes('road network') || rs.includes('utilities') || rs.includes('gis');
+      });
+    }
+    return records; // 'fresh' = complete active GHMC tracker
+  }
+
+  function getActiveRecords() {
+    return filterBySource(state.allColonies, state.activeSource);
+  }
+
+  function mergePendingEdits(records) {
+    const map = new Map();
+    records.forEach((r) => map.set(String(r.row), { ...r }));
+
+    Object.entries(state.pendingEdits).forEach(([key, edit]) => {
+      if (edit._isNew) {
+        if (!map.has(key)) map.set(key, { ...edit });
+      } else if (map.has(key)) {
+        map.set(key, { ...map.get(key), ...edit, _pendingSync: true });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => (Number(a.row) || 0) - (Number(b.row) || 0));
+  }
+
+  /* ==========================================================================
+     Live Google Sheets Sync (Read & Write)
+     ========================================================================== */
+
+  function isWriteConnected() {
+    return Boolean(state.envWriteConfigured || (state.scriptUrl && state.scriptUrl.startsWith('https://script.google.com/')));
+  }
+
+  async function fetchLiveSheetData(silent = false) {
+    const refreshIcon = document.getElementById('refreshIcon');
+    if (refreshIcon) refreshIcon.classList.add('fa-spin');
+
+    let fetched = null;
+    let sourceLabel = 'snapshot';
+
+    // 1. Try Netlify Serverless Function (/api/sheet-sync) first
+    try {
+      const qs = state.scriptUrl ? `?scriptUrl=${encodeURIComponent(state.scriptUrl)}` : '';
+      const res = await fetch(`${CONFIG.apiEndpoint}${qs}`, { cache: 'no-store' });
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data && data.ok && Array.isArray(data.colonies) && data.colonies.length > 0) {
+          fetched = data.colonies;
+          sourceLabel = data.source || 'gviz-csv';
+          state.envWriteConfigured = Boolean(data.envConfigured);
+        }
+      }
+    } catch {
+      // Running outside Netlify (e.g., local static server) — continue to direct fallback
+    }
+
+    // 2. Direct Apps Script GET fallback (if user configured script URL locally)
+    if (!fetched && state.scriptUrl && state.scriptUrl.startsWith('https://script.google.com/')) {
+      try {
+        const res = await fetch(`${state.scriptUrl}${state.scriptUrl.includes('?') ? '&' : '?'}action=read`, { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.ok && Array.isArray(data.colonies)) {
+            fetched = data.colonies;
+            sourceLabel = 'apps-script';
+          }
+        }
+      } catch {
+        // Continue to GViz CSV
+      }
+    }
+
+    // 3. Direct Google Sheets GViz CSV fallback (public read-only CORS endpoint)
+    if (!fetched) {
+      try {
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(CONFIG.sheetName)}&_=${Date.now()}`;
+        const res = await fetch(csvUrl, { cache: 'no-store' });
+        if (res.ok) {
+          const text = await res.text();
+          const parsed = parseCSV(text);
+          const rows = [];
+          for (let i = 1; i < parsed.length; i++) {
+            const cols = parsed[i];
+            const hasData = cols.slice(1, 9).some((v) => v !== undefined && String(v).trim() !== '');
+            if (!hasData) continue;
+            rows.push({
+              row: i + 1,
+              sno: String(cols[0] || '').trim(),
+              circle: String(cols[1] || '').trim(),
+              ward: String(cols[2] || '').trim(),
+              colony: String(cols[3] || '').trim(),
+              date: normalizeCsvDate(cols[4]),
+              status: (String(cols[5] || 'HOLD').trim().toUpperCase()) || 'HOLD',
+              dashboardRaw: String(cols[6] || '').trim(),
+              finalRaw: String(cols[7] || '').trim(),
+              dashboardCount: parseNumeric(cols[6]),
+              finalCount: parseNumeric(cols[7]),
+              reason: String(cols[8] || '').trim()
+            });
+          }
+          if (rows.length > 0) {
+            fetched = rows;
+            sourceLabel = 'gviz-csv';
+          }
+        }
+      } catch {
+        // Offline fallback handled below
+      }
+    }
+
+    if (fetched) {
+      state.allColonies = mergePendingEdits(fetched);
+      state.syncMode = sourceLabel;
+      state.lastSyncedAt = new Date();
+      if (!silent) {
+        showToast(`Synced ${fetched.length} live records from Google Sheet (${CONFIG.sheetName})`, 'success');
+      }
+    } else if (state.allColonies.length === 0 && window.GHMC_INITIAL_DATA) {
+      state.allColonies = mergePendingEdits(window.GHMC_INITIAL_DATA.colonies || []);
+      state.syncMode = 'snapshot';
+      state.lastSyncedAt = new Date();
+      if (!silent) {
+        showToast('Loaded embedded Excel snapshot (offline fallback)', 'warn');
+      }
+    }
+
+    if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+    updateSyncStatusUI();
+    renderAll();
+  }
+
+  async function writeToGoogleSheet(action, payload) {
+    // 1. Try Netlify serverless proxy first (cleanest CORS + env var support)
+    try {
+      const res = await fetch(CONFIG.apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          scriptUrl: state.scriptUrl || undefined,
+          data: payload.data,
+          items: payload.items
+        })
+      });
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        return await res.json();
+      }
+    } catch {
+      // Fallback to direct Apps Script POST when running locally
+    }
+
+    // 2. Direct Apps Script POST (when opened locally without Netlify Functions)
+    if (state.scriptUrl && state.scriptUrl.startsWith('https://script.google.com/')) {
+      try {
+        const res = await fetch(state.scriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action, data: payload.data, items: payload.items }),
+          redirect: 'follow'
+        });
+        const text = await res.text();
+        return JSON.parse(text);
+      } catch (err) {
+        return { ok: false, error: err.message };
+      }
+    }
+
+    return {
+      ok: false,
+      needsSetup: true,
+      message: 'Connect your Google Apps Script Web App URL in Excel 2-Way Sync Setup to push updates directly to Google Sheets.'
+    };
+  }
+
+  function updateSyncStatusUI() {
+    const count = state.allColonies.length;
+    const writeReady = isWriteConnected();
+    const pendingCount = Object.keys(state.pendingEdits).length;
+
+    const headerDot = document.getElementById('headerSyncDot');
+    const headerText = document.getElementById('headerSyncText');
+    const syncPillText = document.getElementById('syncPillText');
+    const syncPillDot = document.getElementById('syncPillDot');
+    const lastSyncTimeText = document.getElementById('lastSyncTimeText');
+
+    if (headerText) {
+      headerText.textContent = writeReady
+        ? '2-Way Excel Sync Active'
+        : (state.syncMode === 'snapshot' ? 'Excel Snapshot Loaded' : 'Google Sheet Live Read');
+    }
+    if (headerDot) {
+      headerDot.classList.toggle('amber', state.syncMode === 'snapshot');
+    }
+    if (syncPillText) {
+      syncPillText.textContent = `${state.syncMode === 'snapshot' ? 'Snapshot' : 'Live Sheet'}: ${count} Rows`;
+    }
+    if (syncPillDot) {
+      syncPillDot.classList.toggle('amber', state.syncMode === 'snapshot');
+    }
+    if (lastSyncTimeText && state.lastSyncedAt) {
+      lastSyncTimeText.textContent = `Updated ${state.lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+
+    // Admin banner
+    const banner = document.getElementById('adminSyncStatusBanner');
+    const msg = document.getElementById('adminSyncStatusMsg');
+    const pushBtn = document.getElementById('btnPushPendingAll');
+    const pushText = document.getElementById('btnPushPendingText');
+    const syncBtnLabel = document.getElementById('adminSyncBtnLabel');
+
+    if (banner && msg) {
+      if (writeReady) {
+        banner.className = 'sync-banner connected';
+        msg.innerHTML = `<i class="fa-solid fa-circle-check"></i> <strong>Two-Way Google Sheets Sync Active!</strong> Saving any row below immediately updates Google Sheet <strong>${CONFIG.sheetName}</strong> and the public dashboard.`;
+      } else {
+        banner.className = 'sync-banner setup-needed';
+        msg.innerHTML = `<i class="fa-solid fa-circle-info"></i> <strong>Live Read Active${pendingCount ? ` (${pendingCount} local change${pendingCount > 1 ? 's' : ''} queued)` : ''}:</strong> To push Admin status edits back into Google Sheets automatically, paste your deployed Apps Script URL in <em>Excel 2-Way Sync Setup</em>.`;
+      }
+    }
+
+    if (pushBtn && pushText) {
+      if (pendingCount > 0) {
+        pushBtn.style.display = 'inline-flex';
+        pushText.textContent = `Push ${pendingCount} Pending to Excel`;
+      } else {
+        pushBtn.style.display = 'none';
+      }
+    }
+
+    if (syncBtnLabel) {
+      syncBtnLabel.textContent = writeReady ? '2-Way Sync: ON' : 'Excel 2-Way Sync';
+    }
+  }
+
+  /* ==========================================================================
+     Rendering All Dashboard Sections
+     ========================================================================== */
+
+  function renderAll() {
+    renderPrimaryTabCounts();
+    renderExecutiveKPIs();
+    renderOverview();
+    renderMonthWise();
+    renderWeekWise();
+    renderDateWise();
+    renderCircleWise();
+    if (state.isAuthenticated) {
+      renderAdminTable();
+    }
+  }
+
+  function renderPrimaryTabCounts() {
+    document.getElementById('countFresh').textContent = filterBySource(state.allColonies, 'fresh').length;
+    document.getElementById('countResubmit').textContent = filterBySource(state.allColonies, 'resubmit').length;
+    document.getElementById('countLayers').textContent = filterBySource(state.allColonies, 'layers').length;
+  }
+
+  function renderExecutiveKPIs() {
+    const records = getActiveRecords();
+    const totalDash = records.reduce((s, r) => s + (Number(r.dashboardCount) || 0), 0);
+    const totalFinal = records.reduce((s, r) => s + (Number(r.finalCount) || 0), 0);
+    const completedRows = records.filter((r) => (r.status || '').toUpperCase() === 'COMPLETED');
+    const completedFinalProps = completedRows.reduce((s, r) => s + (Number(r.finalCount) || 0), 0);
+
+    const validDates = records.map((r) => r.date).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    const lastDate = validDates.length ? validDates[validDates.length - 1] : '';
+
+    document.getElementById('kpiTotalProps').textContent = formatIndianNumber(totalDash);
+    document.getElementById('kpiTotalPropsSub').textContent = `Across ${formatIndianNumber(records.length)} colony records`;
+    document.getElementById('kpiFinalProps').textContent = formatIndianNumber(totalFinal);
+    const pct = totalDash > 0 ? ((totalFinal / totalDash) * 100).toFixed(1) : '0.0';
+    document.getElementById('kpiFinalPropsSub').textContent = `${pct}% of dashboard target verified`;
+    document.getElementById('kpiLastDate').textContent = formatDisplayDate(lastDate);
+    document.getElementById('kpiCompletedColonies').textContent = formatIndianNumber(completedRows.length);
+    document.getElementById('kpiCompletedSub').textContent = `${formatIndianNumber(completedFinalProps)} finalized properties verified`;
+  }
+
+  function computeCircleAggregates(records) {
+    const map = new Map();
+    records.forEach((r) => {
+      const key = normalizeCircleKey(r.circle);
+      if (key === 'UNASSIGNED') return;
+      if (!map.has(key)) {
+        map.set(key, {
+          circle: key,
+          total: 0,
           completed: 0,
           hold: 0,
           progress: 0,
-          dash_props: 0,
-          final_props: 0
-        };
-      }
-      const cd = circleMap[cName];
-      cd.total_colonies++;
-      cd.dash_props += dProps;
-      cd.final_props += fProps;
-      if (status.includes('COMPLETED')) cd.completed++;
-      else if (status.includes('HOLD')) cd.hold++;
-      else cd.progress++;
-    }
-  });
-
-  const circlesList = Object.values(circleMap).map(d => {
-    const pct = d.total_colonies > 0 ? Number(((d.completed / d.total_colonies) * 100).toFixed(1)) : 0;
-    return { ...d, completion_pct: pct };
-  });
-
-  circlesList.sort((a, b) => {
-    if (b.completion_pct !== a.completion_pct) return b.completion_pct - a.completion_pct;
-    return b.total_colonies - a.total_colonies;
-  });
-
-  state.data.circles = circlesList;
-
-  // Update Summary
-  state.data.summary.raw_colonies_count = raw.length;
-  state.data.summary.deduped_colonies_count = deduped.length;
-  state.data.summary.duplicate_groups_count = duplicateGroups.length;
-  state.data.summary.redundant_rows_count = raw.length - deduped.length;
-  state.data.summary.completed_colonies = compCount;
-  state.data.summary.hold_colonies = holdCount;
-  state.data.summary.progress_colonies = progCount;
-  state.data.summary.total_dashboard_props = dashPropsTotal;
-  state.data.summary.total_final_props = finalPropsTotal;
-  state.data.summary.overall_completion_pct = deduped.length > 0 ? Number(((compCount / deduped.length) * 100).toFixed(1)) : 0;
-  state.data.summary.active_circles_count = circlesList.length;
-}
-
-// Event Listeners Setup
-function setupEventListeners() {
-  // Primary Tabs (Fresh, Resubmit, 3Layers)
-  document.querySelectorAll('.primary-tab-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      document.querySelectorAll('.primary-tab-btn').forEach(b => b.classList.remove('active'));
-      const target = e.currentTarget;
-      target.classList.add('active');
-      state.activeSource = target.getAttribute('data-source');
-      handlePrimaryTabChange(state.activeSource);
-    });
-  });
-
-  // Sub Navigation Tabs
-  document.querySelectorAll('.sub-tab-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const target = e.currentTarget;
-      const view = target.getAttribute('data-view');
-
-      // If user clicks Admin Dashboard and is NOT authenticated, show login modal
-      if (view === 'admin' && !state.isAuthenticated) {
-        openLoginModal();
-      }
-
-      document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
-      target.classList.add('active');
-      switchView(view);
-    });
-  });
-
-  // Authentication Triggers
-  document.getElementById('adminAuthBadge').addEventListener('click', () => {
-    if (state.isAuthenticated) {
-      if (confirm(`Currently logged in as ${state.currentUser}. Do you want to logout?`)) {
-        logoutAdmin();
-      }
-    } else {
-      openLoginModal();
-    }
-  });
-
-  document.getElementById('userAvatarBtn').addEventListener('click', () => {
-    if (state.isAuthenticated) {
-      if (confirm(`Logged in as ${state.currentUser}. Log out now?`)) {
-        logoutAdmin();
-      }
-    } else {
-      openLoginModal();
-    }
-  });
-
-  const triggerLockedBtn = document.getElementById('btnTriggerLoginModal');
-  if (triggerLockedBtn) {
-    triggerLockedBtn.addEventListener('click', () => openLoginModal());
-  }
-
-  const logoutBtn = document.getElementById('btnLogoutAdmin');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => logoutAdmin());
-  }
-
-  // Login Modal Events
-  document.getElementById('btnCloseLoginModal').addEventListener('click', () => closeLoginModal());
-  document.getElementById('loginModalOverlay').addEventListener('click', (e) => {
-    if (e.target.id === 'loginModalOverlay') closeLoginModal();
-  });
-
-  document.getElementById('authLoginForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    submitAdminLogin();
-  });
-
-  // Action Buttons
-  document.getElementById('btnQuickPortal').addEventListener('click', () => {
-    switchView('colonies');
-    const tab = document.querySelector('[data-view="colonies"]');
-    if (tab) {
-      document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
-      tab.classList.add('active');
-    }
-  });
-
-  document.getElementById('btnRefreshData').addEventListener('click', () => {
-    showToast('Refreshing live data from Google Sheet & Excel cache...', 'info');
-    setTimeout(() => {
-      recalculateDeduplication();
-      renderAllViews();
-      animateCounters();
-      showToast('Dashboard data refreshed successfully!', 'success');
-    }, 500);
-  });
-
-  document.getElementById('btnExportCSV').addEventListener('click', () => {
-    exportCleanedCSV();
-  });
-
-  document.getElementById('btnPrintPDF').addEventListener('click', () => {
-    window.print();
-  });
-
-  // Colony Filters
-  document.getElementById('colonyStatusFilter').addEventListener('change', (e) => {
-    state.colonyStatusFilter = e.target.value;
-    renderColoniesTable();
-  });
-
-  document.getElementById('colonyDataMode').addEventListener('change', (e) => {
-    state.colonyDataMode = e.target.value;
-    renderColoniesTable();
-  });
-
-  document.getElementById('colonySearchInput').addEventListener('input', (e) => {
-    state.colonySearchTerm = e.target.value.toLowerCase().trim();
-    renderColoniesTable();
-  });
-
-  // Circle & Ward Search
-  const circleSearch = document.getElementById('circleSearchInput');
-  if (circleSearch) {
-    circleSearch.addEventListener('input', (e) => {
-      state.circleSearchTerm = e.target.value.toLowerCase().trim();
-      renderCircleWiseTable();
-    });
-  }
-
-  const wardSearch = document.getElementById('wardSearchInput');
-  if (wardSearch) {
-    wardSearch.addEventListener('input', (e) => {
-      state.wardSearchTerm = e.target.value.toLowerCase().trim();
-      renderWardWiseTable();
-    });
-  }
-
-  // Date Filter
-  const dateFilter = document.getElementById('dateFilterInput');
-  if (dateFilter) {
-    dateFilter.addEventListener('input', (e) => {
-      state.dateFilterTerm = e.target.value.toLowerCase().trim();
-      renderDateWiseTable();
-    });
-  }
-
-  // Deduplication Downloads
-  document.getElementById('btnDownloadCleanExcel').addEventListener('click', () => {
-    exportCleanedExcel();
-  });
-
-  document.getElementById('btnDownloadCleanCSV').addEventListener('click', () => {
-    exportCleanedCSV();
-  });
-
-  // Officers Modal
-  document.getElementById('btnOpenCommissionersModal').addEventListener('click', () => openOfficersModal());
-  document.getElementById('btnCloseOfficersModal').addEventListener('click', () => closeOfficersModal());
-  document.getElementById('btnCloseOfficersModal2').addEventListener('click', () => closeOfficersModal());
-
-  // Colony CRUD Modals
-  const bindAddColony = (btnId) => {
-    const el = document.getElementById(btnId);
-    if (el) {
-      el.addEventListener('click', () => {
-        if (!state.isAuthenticated) {
-          openLoginModal('Admin authentication required to add colonies to Excel.');
-          return;
-        }
-        openColonyModal();
-      });
-    }
-  };
-  bindAddColony('btnAddNewColony');
-  bindAddColony('btnQuickAddColony');
-
-  document.getElementById('btnCloseColonyModal').addEventListener('click', () => closeColonyModal());
-  document.getElementById('btnCancelColonyModal').addEventListener('click', () => closeColonyModal());
-  document.getElementById('btnSaveColony').addEventListener('click', (e) => {
-    e.preventDefault();
-    saveColonyRecord();
-  });
-
-  // Admin Google Sheet Sync
-  document.getElementById('btnSyncGoogleSheet').addEventListener('click', () => {
-    if (!state.isAuthenticated) {
-      openLoginModal();
-      return;
-    }
-    syncWithGoogleSheet();
-  });
-
-  // Admin Excel File Upload
-  const dropZone = document.getElementById('dropZoneContainer');
-  const fileInput = document.getElementById('excelFileInput');
-
-  if (dropZone && fileInput) {
-    dropZone.addEventListener('click', () => {
-      if (!state.isAuthenticated) {
-        openLoginModal();
-        return;
-      }
-      fileInput.click();
-    });
-
-    fileInput.addEventListener('change', handleExcelFileUpload);
-
-    dropZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropZone.style.borderColor = '#2563eb';
-      dropZone.style.background = '#eff6ff';
-    });
-
-    dropZone.addEventListener('dragleave', (e) => {
-      e.preventDefault();
-      dropZone.style.borderColor = '#cbd5e1';
-      dropZone.style.background = '#f8fafc';
-    });
-
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.style.borderColor = '#cbd5e1';
-      dropZone.style.background = '#f8fafc';
-      if (!state.isAuthenticated) {
-        openLoginModal();
-        return;
-      }
-      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-        processUploadedExcelFile(e.dataTransfer.files[0]);
-      }
-    });
-  }
-
-  // Reset to Defaults
-  document.getElementById('btnResetToDefaults').addEventListener('click', () => {
-    if (!state.isAuthenticated) {
-      openLoginModal();
-      return;
-    }
-    if (confirm('Reset all modifications back to the original Google Sheet dataset?')) {
-      localStorage.removeItem('GHMC_DASHBOARD_STATE_COLONIES');
-      state.data = JSON.parse(JSON.stringify(window.GHMC_DATA));
-      recalculateDeduplication();
-      renderAllViews();
-      animateCounters();
-      showToast('Reset to original dataset completed.', 'info');
-    }
-  });
-}
-
-// Authentication Handlers
-function openLoginModal(customMessage = null) {
-  const overlay = document.getElementById('loginModalOverlay');
-  const err = document.getElementById('loginErrorMsg');
-  if (err) {
-    if (customMessage) {
-      err.textContent = customMessage;
-      err.style.color = '#d97706';
-      err.style.display = 'block';
-    } else {
-      err.style.display = 'none';
-    }
-  }
-  if (overlay) overlay.classList.add('active');
-}
-
-function closeLoginModal() {
-  const overlay = document.getElementById('loginModalOverlay');
-  if (overlay) overlay.classList.remove('active');
-}
-
-function submitAdminLogin() {
-  const user = document.getElementById('loginUsername').value.trim();
-  const pass = document.getElementById('loginPassword').value.trim();
-  const btn = document.getElementById('btnLoginSubmit');
-  const btnText = document.getElementById('loginBtnText');
-  const err = document.getElementById('loginErrorMsg');
-
-  if (!user || !pass) {
-    if (err) {
-      err.textContent = 'Please enter both username and password.';
-      err.style.color = '#dc2626';
-      err.style.display = 'block';
-    }
-    return;
-  }
-
-  // Animated authentication feedback
-  btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
-  btn.disabled = true;
-
-  setTimeout(() => {
-    state.isAuthenticated = true;
-    state.currentUser = user;
-    // Do not save to localStorage so that every page refresh requires re-login
-    localStorage.removeItem('GHMC_ADMIN_AUTH');
-    sessionStorage.removeItem('GHMC_ADMIN_AUTH');
-
-    btnText.textContent = 'Login';
-    btn.disabled = false;
-    closeLoginModal();
-    updateAuthUI();
-
-    showToast(`Welcome ${user}! Admin Dashboard unlocked for this session.`, 'success');
-
-    if (state.activeView === 'admin') {
-      const unlocked = document.getElementById('adminUnlockedState');
-      const locked = document.getElementById('adminLockedState');
-      if (locked) locked.style.display = 'none';
-      if (unlocked) {
-        unlocked.style.display = 'block';
-        unlocked.style.animation = 'fadeInUp 0.4s ease';
-      }
-    }
-  }, 400);
-}
-
-function logoutAdmin() {
-  state.isAuthenticated = false;
-  state.currentUser = null;
-  localStorage.removeItem('GHMC_ADMIN_AUTH');
-  updateAuthUI();
-  showToast('Logged out of Admin Suite.', 'info');
-}
-
-// Switch between Sub-Views with Animated Transitions
-function switchView(viewName) {
-  state.activeView = viewName;
-  const views = [
-    { id: 'viewOverview', key: 'overview' },
-    { id: 'viewCircle', key: 'circle' },
-    { id: 'viewWard', key: 'ward' },
-    { id: 'viewDate', key: 'date' },
-    { id: 'viewColonies', key: 'colonies' },
-    { id: 'viewDedup', key: 'dedup' },
-    { id: 'viewQC', key: 'qc' },
-    { id: 'viewAdmin', key: 'admin' }
-  ];
-
-  views.forEach(v => {
-    const el = document.getElementById(v.id);
-    if (el) {
-      if (v.key === viewName) {
-        el.style.display = 'block';
-        el.style.animation = 'fadeInUp 0.35s ease';
-      } else {
-        el.style.display = 'none';
-      }
-    }
-  });
-
-  if (viewName === 'overview') {
-    setTimeout(() => {
-      if (state.chartTimelineInstance) state.chartTimelineInstance.resize();
-      if (state.chartCircleInstance) state.chartCircleInstance.resize();
-    }, 100);
-  }
-}
-
-// Handle Primary Tab Switching
-function handlePrimaryTabChange(source) {
-  if (source === 'fresh') {
-    showToast('Switched to 1. Fresh Data (Current GHMC Dashboard)', 'info');
-    document.getElementById('cardReadySubmit').textContent = '26,083';
-  } else if (source === 'resubmit') {
-    showToast('Switched to 2. Resubmit Data (Revisions & Field Returns)', 'info');
-    document.getElementById('cardReadySubmit').textContent = '4,195';
-  } else if (source === 'layers') {
-    showToast('Switched to 3. 3Layers Data (Road Network & GIS Layers)', 'info');
-    document.getElementById('cardReadySubmit').textContent = '12,850';
-  }
-}
-
-// Render All Views
-function renderAllViews() {
-  renderOverviewKPIs();
-  renderTopLeastCirclesTables();
-  renderTimelineChart();
-  renderCircleAchievementChart();
-  renderCircleWiseTable();
-  renderWardWiseTable();
-  renderDateWiseTable();
-  renderColoniesTable();
-  renderDeduplicationView();
-  renderQCWorkView();
-  renderOfficersData();
-  updateAuthUI();
-}
-
-// Animated Counters for Key Metrics
-function animateCounters() {
-  document.querySelectorAll('.counter').forEach(counter => {
-    const target = parseInt(counter.getAttribute('data-target') || '0', 10);
-    if (target === 0) return;
-    const duration = 1000;
-    const stepTime = 20;
-    const steps = duration / stepTime;
-    const increment = target / steps;
-    let current = 0;
-
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= target) {
-        counter.textContent = target.toLocaleString();
-        clearInterval(timer);
-      } else {
-        counter.textContent = Math.floor(current).toLocaleString();
-      }
-    }, stepTime);
-  });
-}
-
-// Render Overview Section KPIs & Header Cards
-function renderOverviewKPIs() {
-  const sum = state.data.summary;
-  document.getElementById('cardTotalProps').textContent = sum.total_properties;
-  document.getElementById('cardSubmittedProps').textContent = sum.submitted_properties;
-  document.getElementById('cardLastDate').textContent = sum.last_submitted_date;
-  document.getElementById('cardReadySubmit').textContent = sum.ready_to_submit;
-
-  document.getElementById('kpiRawColonies').textContent = sum.raw_colonies_count;
-  document.getElementById('kpiCleanColonies').textContent = sum.deduped_colonies_count;
-  document.getElementById('kpiCompletedColonies').textContent = sum.completed_colonies;
-  document.getElementById('kpiHoldColonies').textContent = sum.hold_colonies;
-  document.getElementById('kpiDashProps').textContent = Number(sum.total_dashboard_props).toLocaleString();
-  document.getElementById('kpiFinalProps').textContent = Number(sum.total_final_props).toLocaleString();
-  document.getElementById('kpiOverallAchievement').textContent = `${sum.overall_completion_pct}%`;
-
-  document.getElementById('valTaskCompletion').textContent = `${sum.overall_completion_pct}%`;
-  document.getElementById('fillTaskCompletion').style.width = `${sum.overall_completion_pct}%`;
-}
-
-// Render Top 3 & Least 3 Circles Tables
-function renderTopLeastCirclesTables() {
-  const circles = [...state.data.circles];
-  const top3 = circles.slice(0, 3);
-  const least3 = [...circles].reverse().slice(0, 3);
-
-  // Top 3 Circles
-  const topBody = document.getElementById('topPerformersBody');
-  topBody.innerHTML = top3.map(c => `
-    <tr>
-      <td style="font-weight: 700;">${c.circle}</td>
-      <td class="text-right" style="color: #64748b;">${c.completed} / ${c.total_colonies}</td>
-      <td class="text-right" style="font-weight: 600;">${Number(c.final_props).toLocaleString()}</td>
-      <td class="text-right">
-        <span class="achievement-badge-top">${c.completion_pct.toFixed(1)}%</span>
-      </td>
-    </tr>
-  `).join('');
-
-  // Least 3 Circles
-  const leastBody = document.getElementById('leastPerformersBody');
-  leastBody.innerHTML = least3.map(c => `
-    <tr>
-      <td style="font-weight: 700;">${c.circle}</td>
-      <td class="text-right" style="color: #64748b;">${c.total_colonies} total</td>
-      <td class="text-right" style="font-weight: 600; color: #dc2626;">${c.hold} on Hold</td>
-      <td class="text-right">
-        <span class="achievement-badge-least">${c.completion_pct.toFixed(1)}%</span>
-      </td>
-    </tr>
-  `).join('');
-}
-
-// Render Left Chart: Daily Properties Target vs Finalized Timeline with Smooth Easing
-function renderTimelineChart() {
-  const ctx = document.getElementById('chartDailyTimeline');
-  if (!ctx) return;
-
-  if (state.chartTimelineInstance) {
-    state.chartTimelineInstance.destroy();
-  }
-
-  const timeline = state.data.daily_timeline || [];
-  const labels = timeline.map(t => t.date);
-  const targets = timeline.map(t => t.dash_props);
-  const finalized = timeline.map(t => t.final_props);
-
-  state.chartTimelineInstance = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: 'Dashboard Properties Target',
-          data: targets,
-          backgroundColor: '#2563eb',
-          borderRadius: 2,
-          barPercentage: 0.6,
-          categoryPercentage: 0.7
-        },
-        {
-          label: 'Final Verified Properties',
-          data: finalized,
-          backgroundColor: '#10b981',
-          borderRadius: 2,
-          barPercentage: 0.6,
-          categoryPercentage: 0.7
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: {
-        duration: 1100,
-        easing: 'easeOutQuart'
-      },
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: {
-            boxWidth: 12,
-            font: { size: 11, family: 'Inter', weight: 600 }
-          }
-        },
-        tooltip: {
-          backgroundColor: '#0e274c',
-          padding: 10,
-          titleFont: { size: 12, weight: 700 }
-        }
-      },
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: {
-            maxRotation: 45,
-            minRotation: 45,
-            font: { size: 9, family: 'Inter' },
-            color: '#64748b'
-          }
-        },
-        y: {
-          beginAtZero: true,
-          grid: { color: '#f1f5f9' },
-          ticks: {
-            font: { size: 10, family: 'Inter' },
-            color: '#64748b'
-          }
-        }
-      }
-    }
-  });
-}
-
-// Render Right Chart: Circle Completion % with Staggered Entrance
-function renderCircleAchievementChart() {
-  const ctx = document.getElementById('chartEmployeeAchievement');
-  if (!ctx) return;
-
-  if (state.chartCircleInstance) {
-    state.chartCircleInstance.destroy();
-  }
-
-  const circles = [...state.data.circles];
-  const labels = circles.map(c => c.circle.replace(/^\d+-/, ''));
-  const values = circles.map(c => c.completion_pct);
-
-  const bgColors = values.map(v => {
-    if (v >= 90) return '#059669'; // Green
-    if (v >= 75) return '#d97706'; // Dark amber
-    if (v >= 60) return '#f59e0b'; // Amber
-    if (v >= 40) return '#fb923c'; // Orange
-    if (v >= 20) return '#fca5a5'; // Light red
-    return '#f87171'; // Red for 0%
-  });
-
-  state.chartCircleInstance = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: 'Colony Delivery %',
-          data: values,
-          backgroundColor: bgColors,
-          borderRadius: 3,
-          barPercentage: 0.65
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: {
-        duration: 1200,
-        easing: 'easeOutQuart'
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#0e274c',
-          callbacks: {
-            label: (ctx) => `Completion: ${ctx.parsed.y.toFixed(1)}%`
-          }
-        }
-      },
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: {
-            maxRotation: 45,
-            minRotation: 45,
-            font: { size: 9, family: 'Inter' },
-            color: '#64748b'
-          }
-        },
-        y: {
-          beginAtZero: true,
-          max: 105,
-          grid: { color: '#f1f5f9' },
-          ticks: {
-            callback: (val) => `${val}%`,
-            stepSize: 25,
-            font: { size: 10, family: 'Inter' },
-            color: '#64748b'
-          }
-        }
-      }
-    }
-  });
-}
-
-// Render Circle Wise Table
-function renderCircleWiseTable() {
-  const tbody = document.getElementById('circleWiseTableBody');
-  if (!tbody) return;
-
-  let list = [...state.data.circles];
-  if (state.circleSearchTerm) {
-    list = list.filter(c => c.circle.toLowerCase().includes(state.circleSearchTerm));
-  }
-
-  tbody.innerHTML = list.map((c, idx) => {
-    const statusClass = c.completion_pct >= 80 ? 'status-completed' : (c.completion_pct >= 50 ? 'status-progress' : 'status-hold');
-    const statusText = c.completion_pct >= 80 ? 'HIGH COMPLETION' : (c.completion_pct >= 50 ? 'IN PROGRESS' : 'ATTENTION REQUIRED');
-
-    return `
-      <tr>
-        <td style="color: #64748b; font-weight: 600;">${idx + 1}</td>
-        <td style="font-weight: 700; color: #0e274c;">${c.circle}</td>
-        <td class="text-right">${c.total_colonies}</td>
-        <td class="text-right" style="color: #059669; font-weight: 600;">${c.completed}</td>
-        <td class="text-right" style="color: #dc2626; font-weight: 600;">${c.hold}</td>
-        <td class="text-right">${Number(c.dash_props).toLocaleString()}</td>
-        <td class="text-right" style="font-weight: 700;">${Number(c.final_props).toLocaleString()}</td>
-        <td class="text-right">
-          <span class="achievement-badge-top" style="background: ${c.completion_pct >= 70 ? '#ecfdf5' : '#fef2f2'}; color: ${c.completion_pct >= 70 ? '#065f46' : '#991b1b'};">
-            ${c.completion_pct.toFixed(1)}%
-          </span>
-        </td>
-        <td>
-          <span class="status-tag ${statusClass}">${statusText}</span>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
-
-// Render Ward Wise Table (300 Wards from Sheet 2)
-function renderWardWiseTable() {
-  const tbody = document.getElementById('wardWiseTableBody');
-  if (!tbody) return;
-
-  let list = state.data.wards || [];
-  if (state.wardSearchTerm) {
-    list = list.filter(w => 
-      w.ward.toLowerCase().includes(state.wardSearchTerm) ||
-      w.circle.toLowerCase().includes(state.wardSearchTerm) ||
-      w.zone.toLowerCase().includes(state.wardSearchTerm)
-    );
-  }
-
-  tbody.innerHTML = list.slice(0, 100).map(w => `
-    <tr>
-      <td style="color: #64748b;">${w.sno}</td>
-      <td style="font-weight: 600; color: #0e274c;">${w.zone}</td>
-      <td>${w.circle}</td>
-      <td style="font-weight: 700; color: #1d4ed8;">${w.ward}</td>
-    </tr>
-  `).join('');
-}
-
-// Render Date Wise Table
-function renderDateWiseTable() {
-  const tbody = document.getElementById('dateWiseTableBody');
-  if (!tbody) return;
-
-  let timeline = [...state.data.daily_timeline];
-  if (state.dateFilterTerm) {
-    timeline = timeline.filter(t => t.date.toLowerCase().includes(state.dateFilterTerm));
-  }
-
-  tbody.innerHTML = timeline.map(t => {
-    return `
-      <tr>
-        <td style="font-weight: 700;">${t.date}</td>
-        <td class="text-right">${t.colonies} colonies</td>
-        <td class="text-right">${Number(t.dash_props).toLocaleString()}</td>
-        <td class="text-right" style="font-weight: 700;">${Number(t.final_props).toLocaleString()}</td>
-        <td>
-          <span class="status-tag status-completed">DELIVERED</span>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
-
-// Render QC & Layers View
-function renderQCWorkView() {
-  const raw = state.data.colonies_raw || [];
-  const rejected = raw.filter(c => c.status === 'HOLD' || (c.reason && c.reason !== '-' && c.reason !== 'COMPLETED'));
-
-  const tbody = document.getElementById('qcIssuesTableBody');
-  if (!tbody) return;
-
-  tbody.innerHTML = rejected.slice(0, 20).map(r => `
-    <tr>
-      <td style="font-weight: 700; color: #0e274c;">${r.colony}</td>
-      <td>${r.circle}</td>
-      <td>${r.ward}</td>
-      <td><span class="status-tag status-hold">${r.status}</span></td>
-      <td style="color: #991b1b; font-weight: 600;">
-        <i class="fa-solid fa-circle-exclamation"></i> ${r.reason}
-      </td>
-    </tr>
-  `).join('');
-}
-
-// Render Colonies Table (with Toggle: Deduplicated Clean vs Raw)
-function renderColoniesTable() {
-  const tbody = document.getElementById('coloniesTableBody');
-  if (!tbody) return;
-
-  const isDedup = state.colonyDataMode === 'dedup';
-  let list = isDedup ? state.data.colonies_deduped : state.data.colonies_raw;
-
-  if (state.colonyStatusFilter !== 'ALL') {
-    list = list.filter(c => (c.status || '').toUpperCase() === state.colonyStatusFilter);
-  }
-
-  if (state.colonySearchTerm) {
-    list = list.filter(c => 
-      (c.colony || '').toLowerCase().includes(state.colonySearchTerm) ||
-      (c.circle || '').toLowerCase().includes(state.colonySearchTerm) ||
-      (c.ward || '').toLowerCase().includes(state.colonySearchTerm) ||
-      (c.reason || '').toLowerCase().includes(state.colonySearchTerm)
-    );
-  }
-
-  document.getElementById('coloniesTableTitle').innerHTML = isDedup
-    ? `<i class="fa-solid fa-map-pin text-blue-600"></i> Surveyed Colonies List (Deduplicated: 93 Unique Colonies)`
-    : `<i class="fa-solid fa-map-pin text-amber-600"></i> Raw Surveyed Colonies List (158 Excel Rows with Duplicates)`;
-  
-  document.getElementById('colonyRecordCountBadge').textContent = `Showing ${list.length} records`;
-
-  tbody.innerHTML = list.map(c => {
-    const isCompleted = (c.status || '').toUpperCase() === 'COMPLETED';
-    const isHold = (c.status || '').toUpperCase() === 'HOLD';
-    const statusClass = isCompleted ? 'status-completed' : (isHold ? 'status-hold' : 'status-progress');
-
-    const dedupBadge = c.is_deduplicated && isDedup
-      ? `<span class="dedup-badge" title="Consolidated from ${c.duplicates_merged} field dates">${c.duplicates_merged}x</span>`
-      : '';
-
-    return `
-      <tr>
-        <td style="color: #64748b;">${c.sno || '-'}</td>
-        <td style="font-weight: 600;">${c.circle || '-'}</td>
-        <td>${c.ward || '-'}</td>
-        <td style="font-weight: 700; color: #0e274c;">
-          ${c.colony || '-'} ${dedupBadge}
-        </td>
-        <td style="color: #64748b;">${c.alloted_date || '-'}</td>
-        <td>
-          <span class="status-tag ${statusClass}">${c.status || 'UNKNOWN'}</span>
-        </td>
-        <td class="text-right">${c.dashboard_count || '-'}</td>
-        <td class="text-right" style="font-weight: 700;">${c.final_count || '-'}</td>
-        <td style="font-size: 11.5px; color: ${isHold ? '#991b1b' : '#64748b'};">
-          ${c.reason || '-'}
-        </td>
-        <td>
-          <button class="action-btn" style="padding: 3px 8px; font-size: 11px;" onclick="editColonyRecord(${c.id})">
-            <i class="fa-solid fa-pen-to-square"></i>
-          </button>
-          <button class="action-btn" style="padding: 3px 8px; font-size: 11px; color: #dc2626;" onclick="deleteColonyRecord(${c.id})">
-            <i class="fa-solid fa-trash"></i>
-          </button>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
-
-// Render De-duplication Inspector View
-function renderDeduplicationView() {
-  const container = document.getElementById('duplicateCardsContainer');
-  if (!container) return;
-
-  const groups = state.data.duplicate_groups || [];
-
-  container.innerHTML = groups.map((g, idx) => {
-    const sorted = [...g.items].sort((a, b) => (b.alloted_date || '').localeCompare(a.alloted_date || ''));
-    const keptId = sorted[0].id;
-
-    const rowsHtml = sorted.map(row => {
-      const isKept = row.id === keptId;
-      return `
-        <div class="dedup-row-item ${isKept ? 'kept-record' : 'redundant-record'}">
-          <div>
-            <strong>${isKept ? '✓ RETAINED MASTER:' : '✗ DUPLICATE:'}</strong>
-            <span style="margin-left: 8px; color: #0e274c; font-weight: 600;">Date: ${row.alloted_date || 'No Date'}</span>
-            <span style="margin-left: 12px; color: #64748b;">SNO: ${row.sno}</span>
-            <span style="margin-left: 12px;">Status: <strong>${row.status}</strong></span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 14px;">
-            <span>Dashboard: <strong>${row.dashboard_count}</strong></span>
-            <span>Final: <strong>${row.final_count}</strong></span>
-            <span style="font-size: 11px; color: #64748b;">${row.reason || '-'}</span>
-            <span class="status-tag ${isKept ? 'status-completed' : 'status-neutral'}" style="font-size: 10px;">
-              ${isKept ? 'ACTIVE RECORD' : 'REDUNDANT'}
-            </span>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    return `
-      <div class="dedup-card">
-        <div class="dedup-card-header">
-          <div>
-            <strong style="color: #0e274c; font-size: 13.5px;">${idx + 1}. ${g.colony_name}</strong>
-            <span style="margin-left: 10px; font-size: 11.5px; color: #64748b;">Circle: ${g.circle} | Ward: ${g.ward}</span>
-          </div>
-          <div>
-            <span class="dedup-badge">${g.occurrence_count} Duplicate Entries</span>
-          </div>
-        </div>
-        ${rowsHtml}
-      </div>
-    `;
-  }).join('');
-}
-
-// Render Zonal Commissioners and Circle DCs
-function renderOfficersData() {
-  const commTable = document.getElementById('commissionersTableBody');
-  const dcsTable = document.getElementById('dcsTableBody');
-
-  if (commTable && state.data.commissioners) {
-    commTable.innerHTML = state.data.commissioners.map(c => `
-      <tr>
-        <td>${c.sno}</td>
-        <td style="font-weight: 700; color: #0e274c;">${c.zone}</td>
-        <td style="font-weight: 600; color: #1d4ed8;">${c.commissioner}</td>
-      </tr>
-    `).join('');
-  }
-
-  if (dcsTable && state.data.dcs) {
-    dcsTable.innerHTML = state.data.dcs.map(d => `
-      <tr>
-        <td style="color: #64748b;">${d.circle_num}</td>
-        <td style="font-weight: 600;">${d.zone}</td>
-        <td style="font-weight: 700; color: #0e274c;">${d.circle_name}</td>
-        <td>${d.dc_name}</td>
-        <td style="font-weight: 600; color: #059669;">
-          <i class="fa-solid fa-phone" style="font-size: 11px;"></i> ${d.phone || '-'}
-        </td>
-      </tr>
-    `).join('');
-  }
-}
-
-// Open Officers Modal
-function openOfficersModal() {
-  document.getElementById('officersModalOverlay').classList.add('active');
-}
-function closeOfficersModal() {
-  document.getElementById('officersModalOverlay').classList.remove('active');
-}
-
-// Colony CRUD Operations
-function openColonyModal(colonyId = null) {
-  const overlay = document.getElementById('colonyModalOverlay');
-  const title = document.getElementById('colonyModalTitle');
-  const form = document.getElementById('colonyForm');
-
-  if (colonyId) {
-    title.textContent = 'Edit Colony Record';
-    const rec = state.data.colonies_raw.find(c => c.id === colonyId);
-    if (rec) {
-      document.getElementById('formColonyId').value = rec.id;
-      document.getElementById('formSno').value = rec.sno;
-      document.getElementById('formCircle').value = rec.circle;
-      document.getElementById('formWard').value = rec.ward;
-      document.getElementById('formColonyName').value = rec.colony;
-      document.getElementById('formAllotedDate').value = rec.alloted_date;
-      document.getElementById('formStatus').value = rec.status;
-      document.getElementById('formDashCount').value = rec.dashboard_count;
-      document.getElementById('formFinalCount').value = rec.final_count;
-      document.getElementById('formReason').value = rec.reason;
-    }
-  } else {
-    title.textContent = 'Add New Colony Record';
-    form.reset();
-    document.getElementById('formColonyId').value = '';
-    document.getElementById('formSno').value = state.data.colonies_raw.length + 1;
-    document.getElementById('formAllotedDate').value = new Date().toISOString().split('T')[0];
-  }
-
-  overlay.classList.add('active');
-}
-
-function closeColonyModal() {
-  document.getElementById('colonyModalOverlay').classList.remove('active');
-}
-
-function saveColonyRecord() {
-  if (!state.isAuthenticated) {
-    openLoginModal('Please authenticate as Admin to push colony records to Excel.');
-    return;
-  }
-
-  const idVal = document.getElementById('formColonyId').value;
-  const newRecord = {
-    id: idVal ? parseInt(idVal, 10) : Date.now(),
-    sno: document.getElementById('formSno').value || '',
-    circle: document.getElementById('formCircle').value,
-    ward: document.getElementById('formWard').value,
-    colony: document.getElementById('formColonyName').value,
-    alloted_date: document.getElementById('formAllotedDate').value,
-    status: document.getElementById('formStatus').value,
-    dashboard_count: document.getElementById('formDashCount').value || '-',
-    final_count: document.getElementById('formFinalCount').value || '-',
-    reason: document.getElementById('formReason').value || '-'
-  };
-
-  if (!newRecord.colony || !newRecord.circle) {
-    alert('Please fill in Circle and Colony Name.');
-    return;
-  }
-
-  // Visual save progress on modal button
-  const saveBtn = document.getElementById('btnSaveColony');
-  const originalBtnHtml = saveBtn ? saveBtn.innerHTML : 'Save Colony';
-  if (saveBtn) {
-    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Pushing to Excel...';
-    saveBtn.disabled = true;
-  }
-
-  // Update in-memory state immediately
-  if (idVal) {
-    const idx = state.data.colonies_raw.findIndex(c => c.id === parseInt(idVal, 10));
-    if (idx !== -1) {
-      state.data.colonies_raw[idx] = newRecord;
-    }
-  } else {
-    state.data.colonies_raw.unshift(newRecord);
-  }
-
-  recalculateDeduplication();
-  saveStateToStorage();
-  renderAllViews();
-  closeColonyModal();
-
-  // Push directly to Excel via server API
-  showToast(`Pushing '${newRecord.colony}' to GHMC_Data.xlsx...`, 'info');
-
-  fetch('/api/save-colony', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(newRecord)
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      showToast(`✓ Colony '${newRecord.colony}' successfully pushed to GHMC_Data.xlsx (Row ${data.row})!`, 'success');
-    } else {
-      showToast(`Colony saved to dashboard. (Server note: ${data.error})`, 'info');
-    }
-  })
-  .catch(err => {
-    console.warn('Backend server not reachable for Excel push:', err);
-    showToast(`✓ Colony '${newRecord.colony}' saved in dashboard session!`, 'success');
-  })
-  .finally(() => {
-    if (saveBtn) {
-      saveBtn.innerHTML = originalBtnHtml;
-      saveBtn.disabled = false;
-    }
-  });
-}
-
-window.editColonyRecord = function(id) {
-  if (!state.isAuthenticated) {
-    openLoginModal();
-    return;
-  }
-  openColonyModal(id);
-};
-
-window.deleteColonyRecord = function(id) {
-  if (!state.isAuthenticated) {
-    openLoginModal();
-    return;
-  }
-  if (confirm('Are you sure you want to delete this colony record?')) {
-    state.data.colonies_raw = state.data.colonies_raw.filter(c => c.id !== id);
-    recalculateDeduplication();
-    saveStateToStorage();
-    renderAllViews();
-    showToast('Record deleted.', 'info');
-  }
-};
-
-// Google Sheet Live Sync Function
-async function syncWithGoogleSheet() {
-  const syncBtn = document.getElementById('btnSyncGoogleSheet');
-  syncBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
-  syncBtn.disabled = true;
-
-  const url = 'https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/gviz/tq?tqx=out:csv';
-
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Network response error: ' + response.statusText);
-    const csvText = await response.text();
-    parseGoogleSheetCSV(csvText);
-    showToast('Successfully synchronized live data with Google Sheets!', 'success');
-  } catch (err) {
-    console.warn('Direct fetch blocked by browser CORS policy. Refreshing local dataset.', err);
-    recalculateDeduplication();
-    renderAllViews();
-    showToast('Synchronized with Google Sheets data pipeline (Verified 158 rows).', 'success');
-  } finally {
-    syncBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> Sync Live from Google Sheets';
-    syncBtn.disabled = false;
-  }
-}
-
-function parseGoogleSheetCSV(csvText) {
-  const lines = csvText.split(/\r\n|\n/).filter(line => line.trim() !== '');
-  if (lines.length < 2) return;
-
-  const parsed = [];
-  for (let i = 1; i < lines.length; i++) {
-    const row = parseCSVRow(lines[i]);
-    if (row.length >= 4 && row[3] && row[3].trim() !== '') {
-      parsed.push({
-        id: i,
-        sno: row[0] || String(i),
-        circle: row[1] || '-',
-        ward: row[2] || '-',
-        colony: row[3] || '-',
-        alloted_date: row[4] || '',
-        status: row[5] || 'COMPLETED',
-        dashboard_count: row[6] || '-',
-        final_count: row[7] || '-',
-        reason: row[8] || '-'
-      });
-    }
-  }
-
-  if (parsed.length > 0) {
-    state.data.colonies_raw = parsed;
-    recalculateDeduplication();
-    saveStateToStorage();
-    renderAllViews();
-    animateCounters();
-  }
-}
-
-function parseCSVRow(line) {
-  const res = [];
-  let inQuotes = false;
-  let cur = '';
-
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') {
-      inQuotes = !inQuotes;
-    } else if (c === ',' && !inQuotes) {
-      res.push(cur.replace(/^"|"$/g, '').trim());
-      cur = '';
-    } else {
-      cur += c;
-    }
-  }
-  res.push(cur.replace(/^"|"$/g, '').trim());
-  return res;
-}
-
-// Handle Excel File Upload (.xlsx, .csv)
-function handleExcelFileUpload(e) {
-  const file = e.target.files[0];
-  if (file) processUploadedExcelFile(file);
-}
-
-function processUploadedExcelFile(file) {
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-      if (jsonData.length > 1) {
-        const rows = jsonData.slice(1);
-        const parsed = [];
-        rows.forEach((r, idx) => {
-          if (r && r[3] && String(r[3]).trim() !== '') {
-            parsed.push({
-              id: idx + 1,
-              sno: String(r[0] || idx + 1),
-              circle: String(r[1] || '-'),
-              ward: String(r[2] || '-'),
-              colony: String(r[3] || '-'),
-              alloted_date: r[4] ? String(r[4]) : '',
-              status: String(r[5] || 'COMPLETED'),
-              dashboard_count: String(r[6] || '-'),
-              final_count: String(r[7] || '-'),
-              reason: String(r[8] || '-')
-            });
-          }
+          target: 0,
+          finalized: 0,
+          rows: []
         });
+      }
+      const agg = map.get(key);
+      agg.total += 1;
+      const st = (r.status || '').toUpperCase();
+      if (st === 'COMPLETED') agg.completed += 1;
+      else if (st === 'PROGRESS') agg.progress += 1;
+      else agg.hold += 1;
+      agg.target += Number(r.dashboardCount) || 0;
+      agg.finalized += Number(r.finalCount) || 0;
+      agg.rows.push(r);
+    });
 
-        if (parsed.length > 0) {
-          state.data.colonies_raw = parsed;
-          recalculateDeduplication();
-          saveStateToStorage();
-          renderAllViews();
-          animateCounters();
-          showToast(`Imported ${parsed.length} colony records from ${file.name}. Pushing to GHMC_Data.xlsx...`, 'info');
+    return Array.from(map.values()).map((c) => {
+      const achievement = c.target > 0
+        ? (c.finalized / c.target) * 100
+        : (c.total > 0 ? (c.completed / c.total) * 100 : 0);
+      return { ...c, achievement };
+    });
+  }
 
-          // Push bulk colonies to server / GHMC_Data.xlsx
-          fetch('/api/save-colonies-bulk', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ colonies: parsed })
-          })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success) {
-              showToast(`✓ Successfully pushed ${data.count || parsed.length} colonies to GHMC_Data.xlsx!`, 'success');
-            } else {
-              showToast(`Colonies imported into dashboard view.`, 'info');
-            }
-          })
-          .catch(err => {
-            console.warn('Backend server not reachable for bulk push:', err);
-            showToast(`✓ Imported ${parsed.length} colony records to dashboard!`, 'success');
-          });
+  function renderOverview() {
+    const records = getActiveRecords();
+    const totalDash = records.reduce((s, r) => s + (Number(r.dashboardCount) || 0), 0);
+    const totalFinal = records.reduce((s, r) => s + (Number(r.finalCount) || 0), 0);
+    const completedCount = records.filter((r) => (r.status || '').toUpperCase() === 'COMPLETED').length;
+    const holdCount = records.filter((r) => (r.status || '').toUpperCase() === 'HOLD').length;
+    const progressCount = records.filter((r) => (r.status || '').toUpperCase() === 'PROGRESS').length;
+    const rejectedCount = records.filter((r) => (r.status || '').toUpperCase() === 'REJECTED').length;
+
+    const circles = new Set(records.map((r) => normalizeCircleKey(r.circle)).filter((c) => c !== 'UNASSIGNED'));
+    const dates = records.map((r) => r.date).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    const uniqueDays = new Set(dates).size;
+    const minDate = dates[0] || '';
+    const maxDate = dates[dates.length - 1] || '';
+
+    const overallAch = totalDash > 0 ? Math.round((totalFinal / totalDash) * 100) : 0;
+    const taskComp = records.length > 0 ? ((completedCount / records.length) * 100).toFixed(1) : '0.0';
+
+    const streamLabels = {
+      fresh: 'OVERALL PERFORMANCE — FRESH DATA',
+      resubmit: 'RESUBMIT & HOLD PERFORMANCE',
+      layers: '3LAYERS & GIS DELIVERY PERFORMANCE'
+    };
+
+    document.getElementById('overviewStreamBadge').textContent = streamLabels[state.activeSource];
+    document.getElementById('overviewHeading').textContent = minDate
+      ? `Output Performance After ${formatDisplayDate(minDate)}`
+      : 'Overall Colony Performance';
+    document.getElementById('overviewSubtext').textContent = minDate
+      ? `Overall colony performance calculated live from Google Sheet COLONIES records (${formatDisplayDate(minDate)} to ${formatDisplayDate(maxDate)})`
+      : 'Overall colony performance calculated live from Google Sheet records';
+
+    document.getElementById('overviewStatusChips').innerHTML = `
+      <span class="summary-chip green"><i class="fa-solid fa-check"></i> Completed: ${completedCount}</span>
+      <span class="summary-chip blue"><i class="fa-solid fa-spinner"></i> Progress: ${progressCount}</span>
+      <span class="summary-chip amber"><i class="fa-solid fa-pause"></i> Hold: ${holdCount + rejectedCount}</span>
+    `;
+
+    document.getElementById('mkTarget').textContent = formatIndianNumber(totalDash);
+    document.getElementById('mkFinalized').textContent = formatIndianNumber(totalFinal);
+    document.getElementById('mkCircles').textContent = formatIndianNumber(circles.size);
+    document.getElementById('mkDays').textContent = formatIndianNumber(uniqueDays);
+    document.getElementById('mkCompleted').textContent = formatIndianNumber(completedCount);
+    document.getElementById('mkAchievement').textContent = `${overallAch}%`;
+    document.getElementById('mkPending').textContent = formatIndianNumber(holdCount + progressCount + rejectedCount);
+    document.getElementById('mkTaskCompletion').textContent = `${taskComp}%`;
+    document.getElementById('mkTaskProgressBar').style.width = `${Math.min(100, Number(taskComp))}%`;
+
+    // Top 3 & Least 3 Performers (Circles with target > 0 first, fallback all)
+    const circleAggs = computeCircleAggregates(records);
+    const rankedPool = circleAggs.filter((c) => c.target > 0);
+    const pool = rankedPool.length >= 3 ? rankedPool : circleAggs;
+
+    const top3 = [...pool].sort((a, b) => b.achievement - a.achievement || b.finalized - a.finalized).slice(0, 3);
+    const least3 = [...pool].sort((a, b) => a.achievement - b.achievement || a.finalized - b.finalized).slice(0, 3);
+
+    const renderPerfRows = (list) => {
+      if (!list.length) {
+        return `<tr><td colspan="4" style="color: var(--text-muted); padding: 14px;">No circle records in this view</td></tr>`;
+      }
+      return list.map((c) => `
+        <tr>
+          <td><span class="perf-link" data-drill-circle="${escapeHtml(c.circle)}">${escapeHtml(c.circle)}</span></td>
+          <td>${formatIndianNumber(c.target)}</td>
+          <td>${formatIndianNumber(c.finalized)}</td>
+          <td><strong>${c.achievement.toFixed(1)}%</strong></td>
+        </tr>
+      `).join('');
+    };
+
+    document.getElementById('topPerformersBody').innerHTML = renderPerfRows(top3);
+    document.getElementById('leastPerformersBody').innerHTML = renderPerfRows(least3);
+
+    // Wire clickable circle links to open Circle Wise drilldown
+    document.querySelectorAll('.perf-link[data-drill-circle]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const circleName = el.getAttribute('data-drill-circle');
+        state.selectedDrilldownCircle = circleName;
+        switchView('circle');
+      });
+    });
+
+    renderOverviewCharts(records, circleAggs);
+  }
+
+  function renderOverviewCharts(records, circleAggs) {
+    // Chart 1: Daily Target vs Finalized (recent 35 active dates for crisp readability like Image 1)
+    const byDate = new Map();
+    records.forEach((r) => {
+      if (!r.date) return;
+      if (!byDate.has(r.date)) byDate.set(r.date, { target: 0, finalized: 0 });
+      const entry = byDate.get(r.date);
+      entry.target += Number(r.dashboardCount) || 0;
+      entry.finalized += Number(r.finalCount) || 0;
+    });
+
+    const sortedDates = Array.from(byDate.keys()).sort();
+    const displayDates = sortedDates.slice(-36);
+    const labelsDaily = displayDates.map(formatShortDate);
+    const targetData = displayDates.map((d) => byDate.get(d).target);
+    const finalData = displayDates.map((d) => byDate.get(d).finalized);
+
+    const ctxDaily = document.getElementById('dailyTargetChart').getContext('2d');
+    if (state.charts.daily) state.charts.daily.destroy();
+    state.charts.daily = new Chart(ctxDaily, {
+      type: 'bar',
+      data: {
+        labels: labelsDaily,
+        datasets: [
+          {
+            label: 'Dashboard Target',
+            data: targetData,
+            backgroundColor: '#3b6fd4',
+            borderRadius: 3,
+            barPercentage: 0.78,
+            categoryPercentage: 0.72
+          },
+          {
+            label: 'Finalized',
+            data: finalData,
+            backgroundColor: '#0e9f6e',
+            borderRadius: 3,
+            barPercentage: 0.78,
+            categoryPercentage: 0.72
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11, weight: '600' } } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 0 } },
+          y: { beginAtZero: true, grid: { color: '#e9eff6' }, ticks: { font: { size: 10.5 } } }
         }
       }
-    } catch (err) {
-      console.error(err);
-      showToast('Error parsing file: ' + err.message, 'danger');
+    });
+
+    // Chart 2: Overall Circle Achievement % (Color-ramped bars matching Image 1!)
+    const sortedCircles = [...circleAggs]
+      .sort((a, b) => b.achievement - a.achievement)
+      .slice(0, 18);
+
+    const circleLabels = sortedCircles.map((c) => c.circle.replace(/^\d+-/, ''));
+    const circleVals = sortedCircles.map((c) => Number(c.achievement.toFixed(1)));
+    const circleColors = circleVals.map((v) => {
+      if (v >= 90) return '#059669';
+      if (v >= 65) return '#f59e0b';
+      if (v >= 35) return '#f97316';
+      return '#ef4444';
+    });
+
+    const ctxCircle = document.getElementById('circleAchievementChart').getContext('2d');
+    if (state.charts.circle) state.charts.circle.destroy();
+    state.charts.circle = new Chart(ctxCircle, {
+      type: 'bar',
+      data: {
+        labels: circleLabels,
+        datasets: [
+          {
+            label: 'Achievement %',
+            data: circleVals,
+            backgroundColor: circleColors,
+            borderRadius: 5,
+            maxBarThickness: 28
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const c = sortedCircles[ctx.dataIndex];
+                return ` ${ctx.parsed.y}% (${formatIndianNumber(c.finalized)} / ${formatIndianNumber(c.target)})`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 9.5 }, maxRotation: 48, minRotation: 30 } },
+          y: {
+            beginAtZero: true,
+            grid: { color: '#e9eff6' },
+            ticks: { callback: (v) => `${v}%`, font: { size: 10.5 } }
+          }
+        }
+      }
+    });
+  }
+
+  /* ==========================================================================
+     Month Wise View
+     ========================================================================== */
+
+  function renderMonthWise() {
+    const records = getActiveRecords();
+    const map = new Map();
+
+    records.forEach((r) => {
+      const ym = r.date && r.date.length >= 7 ? r.date.slice(0, 7) : 'Unknown';
+      if (!map.has(ym)) {
+        map.set(ym, { ym, total: 0, completed: 0, progress: 0, hold: 0, target: 0, finalized: 0 });
+      }
+      const m = map.get(ym);
+      m.total++;
+      const st = (r.status || '').toUpperCase();
+      if (st === 'COMPLETED') m.completed++;
+      else if (st === 'PROGRESS') m.progress++;
+      else m.hold++;
+      m.target += Number(r.dashboardCount) || 0;
+      m.finalized += Number(r.finalCount) || 0;
+    });
+
+    const months = Array.from(map.values()).sort((a, b) => a.ym.localeCompare(b.ym));
+    document.getElementById('monthCountBadge').textContent = `${months.length} Months`;
+
+    document.getElementById('monthTableBody').innerHTML = months.map((m) => {
+      const ach = m.target > 0 ? ((m.finalized / m.target) * 100).toFixed(1) : '0.0';
+      return `
+        <tr>
+          <td><strong>${escapeHtml(formatMonthLabel(m.ym))}</strong></td>
+          <td class="center">${m.total}</td>
+          <td class="center"><span class="status-badge completed">${m.completed}</span></td>
+          <td class="center"><span class="status-badge progress">${m.progress}</span></td>
+          <td class="center"><span class="status-badge hold">${m.hold}</span></td>
+          <td class="num">${formatIndianNumber(m.target)}</td>
+          <td class="num"><strong>${formatIndianNumber(m.finalized)}</strong></td>
+          <td class="center"><strong>${ach}%</strong></td>
+        </tr>
+      `;
+    }).join('') || `<tr><td colspan="8" class="center">No monthly records available</td></tr>`;
+
+    const ctx = document.getElementById('monthWiseChart').getContext('2d');
+    if (state.charts.month) state.charts.month.destroy();
+    state.charts.month = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: months.map((m) => formatMonthLabel(m.ym)),
+        datasets: [
+          { label: 'Dashboard Target', data: months.map((m) => m.target), backgroundColor: '#3b6fd4', borderRadius: 5 },
+          { label: 'Finalized Properties', data: months.map((m) => m.finalized), backgroundColor: '#0e9f6e', borderRadius: 5 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, grid: { color: '#e9eff6' } }
+        }
+      }
+    });
+  }
+
+  /* ==========================================================================
+     Week Wise View
+     ========================================================================== */
+
+  function renderWeekWise() {
+    const records = getActiveRecords();
+    const map = new Map();
+
+    records.forEach((r) => {
+      const ws = getWeekStart(r.date) || 'Unknown';
+      if (!map.has(ws)) {
+        map.set(ws, { ws, total: 0, completed: 0, pending: 0, target: 0, finalized: 0 });
+      }
+      const w = map.get(ws);
+      w.total++;
+      if ((r.status || '').toUpperCase() === 'COMPLETED') w.completed++;
+      else w.pending++;
+      w.target += Number(r.dashboardCount) || 0;
+      w.finalized += Number(r.finalCount) || 0;
+    });
+
+    const weeks = Array.from(map.values()).sort((a, b) => a.ws.localeCompare(b.ws));
+    document.getElementById('weekCountBadge').textContent = `${weeks.length} Weeks`;
+
+    document.getElementById('weekTableBody').innerHTML = [...weeks].reverse().map((w) => {
+      const end = w.ws !== 'Unknown' ? addDays(w.ws, 6) : '';
+      const label = w.ws !== 'Unknown' ? `${formatDisplayDate(w.ws)} to ${formatDisplayDate(end)}` : 'Unknown';
+      const ach = w.target > 0 ? ((w.finalized / w.target) * 100).toFixed(1) : '0.0';
+      return `
+        <tr>
+          <td><strong>${escapeHtml(label)}</strong></td>
+          <td class="center">${w.total}</td>
+          <td class="center"><span class="status-badge completed">${w.completed}</span></td>
+          <td class="center"><span class="status-badge hold">${w.pending}</span></td>
+          <td class="num">${formatIndianNumber(w.target)}</td>
+          <td class="num"><strong>${formatIndianNumber(w.finalized)}</strong></td>
+          <td class="center"><strong>${ach}%</strong></td>
+        </tr>
+      `;
+    }).join('') || `<tr><td colspan="7" class="center">No weekly records available</td></tr>`;
+
+    const ctx = document.getElementById('weekWiseChart').getContext('2d');
+    if (state.charts.week) state.charts.week.destroy();
+    state.charts.week = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: weeks.map((w) => (w.ws !== 'Unknown' ? formatShortDate(w.ws) : 'Unknown')),
+        datasets: [
+          { label: 'Target', data: weeks.map((w) => w.target), backgroundColor: '#4f46e5', borderRadius: 4 },
+          { label: 'Finalized', data: weeks.map((w) => w.finalized), backgroundColor: '#10b981', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 45 } },
+          y: { beginAtZero: true, grid: { color: '#e9eff6' } }
+        }
+      }
+    });
+  }
+
+  /* ==========================================================================
+     Date Wise View
+     ========================================================================== */
+
+  function renderDateWise() {
+    const records = getActiveRecords();
+    const uniqueDates = Array.from(new Set(records.map((r) => r.date).filter(Boolean))).sort().reverse();
+    const sel = document.getElementById('dateWiseSelect');
+
+    if (state.dateWiseSelected === 'LATEST' || (state.dateWiseSelected !== 'ALL' && !uniqueDates.includes(state.dateWiseSelected))) {
+      state.dateWiseSelected = uniqueDates[0] || 'ALL';
     }
-  };
-  reader.readAsArrayBuffer(file);
-}
 
-// Export Cleaned Excel (.xlsx)
-function exportCleanedExcel() {
-  const dataToExport = state.data.colonies_deduped.map(c => ({
-    'SNO': c.sno,
-    'CIRCLE': c.circle,
-    'WARD': c.ward,
-    'COLONY': c.colony,
-    'ALLOTED DATE': c.alloted_date,
-    'COLONY STATUS': c.status,
-    'PROPERTIES COUNT (DASHBOARD)': c.dashboard_count,
-    'PROPERTIES COUNT (FINAL)': c.final_count,
-    'REASON': c.reason,
-    'DUPLICATES MERGED': c.duplicates_merged || 1
-  }));
+    sel.innerHTML = `<option value="ALL">All Dates (${uniqueDates.length})</option>` +
+      uniqueDates.map((d) => `<option value="${d}">${formatDisplayDate(d)}</option>`).join('');
+    sel.value = state.dateWiseSelected;
 
-  const ws = XLSX.utils.json_to_sheet(dataToExport);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "DEDUPLICATED_COLONIES");
+    const filtered = state.dateWiseSelected === 'ALL'
+      ? [...records].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      : records.filter((r) => r.date === state.dateWiseSelected);
 
-  XLSX.writeFile(wb, "GHMC_Cleaned_Deduplicated_Colonies.xlsx");
-  showToast('Exported clean dataset to GHMC_Cleaned_Deduplicated_Colonies.xlsx', 'success');
-}
+    const totalDash = filtered.reduce((s, r) => s + (Number(r.dashboardCount) || 0), 0);
+    const totalFinal = filtered.reduce((s, r) => s + (Number(r.finalCount) || 0), 0);
+    const completed = filtered.filter((r) => (r.status || '').toUpperCase() === 'COMPLETED').length;
 
-// Export Cleaned CSV
-function exportCleanedCSV() {
-  const headers = ['SNO', 'CIRCLE', 'WARD', 'COLONY', 'ALLOTED DATE', 'COLONY STATUS', 'PROPERTIES COUNT (DASHBOARD)', 'PROPERTIES COUNT (FINAL)', 'REASON', 'DUPLICATES_MERGED'];
-  const rows = state.data.colonies_deduped.map(c => [
-    `"${c.sno}"`,
-    `"${c.circle}"`,
-    `"${c.ward}"`,
-    `"${c.colony}"`,
-    `"${c.alloted_date}"`,
-    `"${c.status}"`,
-    `"${c.dashboard_count}"`,
-    `"${c.final_count}"`,
-    `"${c.reason}"`,
-    `"${c.duplicates_merged || 1}"`
-  ]);
+    document.getElementById('dateWiseStats').innerHTML = `
+      <div class="admin-stat-box blue"><div class="as-label">Records</div><div class="as-val">${filtered.length}</div></div>
+      <div class="admin-stat-box green"><div class="as-label">Completed</div><div class="as-val">${completed}</div></div>
+      <div class="admin-stat-box lavender"><div class="as-label">Dashboard Target</div><div class="as-val">${formatIndianNumber(totalDash)}</div></div>
+      <div class="admin-stat-box mint"><div class="as-label">Finalized Count</div><div class="as-val">${formatIndianNumber(totalFinal)}</div></div>
+    `;
 
-  let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map(e => e.join(",")).join("\n");
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "GHMC_Cleaned_Deduplicated_Colonies.csv");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  showToast('Exported clean CSV file.', 'success');
-}
-
-// Save Current State in LocalStorage
-function saveStateToStorage() {
-  try {
-    localStorage.setItem('GHMC_DASHBOARD_STATE_COLONIES', JSON.stringify(state.data));
-  } catch (e) {
-    console.error('Failed to save state to LocalStorage:', e);
+    document.getElementById('dateTableBody').innerHTML = filtered.map((r) => `
+      <tr>
+        <td>${escapeHtml(r.sno)}</td>
+        <td>${escapeHtml(formatDisplayDate(r.date))}</td>
+        <td><strong>${escapeHtml(r.circle)}</strong></td>
+        <td>${escapeHtml(r.ward)}</td>
+        <td>${escapeHtml(r.colony)}</td>
+        <td class="center"><span class="status-badge ${(r.status || 'hold').toLowerCase()}">${escapeHtml(r.status)}</span></td>
+        <td class="num">${formatIndianNumber(r.dashboardCount)}</td>
+        <td class="num"><strong>${formatIndianNumber(r.finalCount)}</strong></td>
+        <td>${escapeHtml(r.reason || '—')}</td>
+      </tr>
+    `).join('') || `<tr><td colspan="9" class="center">No colony records for selected date</td></tr>`;
   }
-}
 
-// Toast Notifications
-function showToast(message, type = 'info') {
-  const container = document.getElementById('toastContainer');
-  if (!container) return;
+  /* ==========================================================================
+     Circle Wise View
+     ========================================================================== */
 
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `
-    <i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}"></i>
-    <span>${message}</span>
-  `;
+  function renderCircleWise() {
+    const records = getActiveRecords();
+    const aggs = computeCircleAggregates(records).sort((a, b) => b.total - a.total);
 
-  container.appendChild(toast);
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    setTimeout(() => toast.remove(), 300);
-  }, 3500);
-}
+    const filterSel = document.getElementById('circleFilterSelect');
+    const prevVal = state.circleFilter;
+    filterSel.innerHTML = `<option value="ALL">All Circles (${aggs.length})</option>` +
+      aggs.map((c) => `<option value="${escapeHtml(c.circle)}">${escapeHtml(c.circle)}</option>`).join('');
+    filterSel.value = aggs.some((c) => c.circle === prevVal) ? prevVal : 'ALL';
 
-// Live Clock Updater
-function updateClock() {
-  const pill = document.getElementById('lastUpdatedPill');
-  if (pill) {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    pill.innerHTML = `<i class="fa-regular fa-clock"></i> <span>Updated ${timeStr}</span>`;
+    const q = state.circleSearch.toLowerCase();
+    const visible = aggs.filter((c) => {
+      if (state.circleFilter !== 'ALL' && c.circle !== state.circleFilter) return false;
+      if (!q) return true;
+      return c.circle.toLowerCase().includes(q) ||
+        c.rows.some((r) => (r.colony || '').toLowerCase().includes(q) || (r.ward || '').toLowerCase().includes(q));
+    });
+
+    document.getElementById('circleSummaryBody').innerHTML = visible.map((c) => `
+      <tr>
+        <td><strong>${escapeHtml(c.circle)}</strong></td>
+        <td class="center">${c.total}</td>
+        <td class="center"><span class="status-badge completed">${c.completed}</span></td>
+        <td class="center"><span class="status-badge progress">${c.progress}</span></td>
+        <td class="center"><span class="status-badge hold">${c.hold}</span></td>
+        <td class="num">${formatIndianNumber(c.target)}</td>
+        <td class="num"><strong>${formatIndianNumber(c.finalized)}</strong></td>
+        <td class="center"><strong>${c.achievement.toFixed(1)}%</strong></td>
+        <td class="center">
+          <button class="row-save-btn" data-view-circle="${escapeHtml(c.circle)}">View Colonies</button>
+        </td>
+      </tr>
+    `).join('') || `<tr><td colspan="9" class="center">No circles match your search</td></tr>`;
+
+    document.querySelectorAll('[data-view-circle]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.selectedDrilldownCircle = btn.getAttribute('data-view-circle');
+        renderCircleDrilldown(aggs);
+      });
+    });
+
+    renderCircleDrilldown(aggs);
   }
-}
+
+  function renderCircleDrilldown(aggs) {
+    const panel = document.getElementById('circleDrilldownPanel');
+    if (!state.selectedDrilldownCircle) {
+      panel.style.display = 'none';
+      return;
+    }
+    const found = aggs.find((c) => c.circle === state.selectedDrilldownCircle);
+    if (!found) {
+      panel.style.display = 'none';
+      return;
+    }
+    panel.style.display = 'block';
+    document.getElementById('circleDrilldownTitle').textContent = `${found.circle} — ${found.rows.length} Colony Records`;
+    document.getElementById('circleDrilldownBody').innerHTML = found.rows.map((r) => `
+      <tr>
+        <td>${escapeHtml(r.sno)}</td>
+        <td>${escapeHtml(r.ward)}</td>
+        <td><strong>${escapeHtml(r.colony)}</strong></td>
+        <td>${escapeHtml(formatDisplayDate(r.date))}</td>
+        <td class="center"><span class="status-badge ${(r.status || 'hold').toLowerCase()}">${escapeHtml(r.status)}</span></td>
+        <td class="num">${formatIndianNumber(r.dashboardCount)}</td>
+        <td class="num"><strong>${formatIndianNumber(r.finalCount)}</strong></td>
+        <td>${escapeHtml(r.reason || '—')}</td>
+      </tr>
+    `).join('');
+  }
+
+  /* ==========================================================================
+     Admin Authentication & Admin Excel-Linked Colony Manager (Images 2 & 3)
+     ========================================================================== */
+
+  function getStoredCreds() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CONFIG.storageKeys.adminCreds) || 'null');
+      if (saved && saved.username && saved.password) return saved;
+    } catch { /* default */ }
+    return { username: 'admin', password: 'admin123' };
+  }
+
+  function restoreAdminSession() {
+    const sess = sessionStorage.getItem(CONFIG.storageKeys.adminSession);
+    if (sess) {
+      try {
+        const parsed = JSON.parse(sess);
+        state.isAuthenticated = true;
+        state.adminUser = parsed.username || 'Admin';
+      } catch {
+        state.isAuthenticated = false;
+      }
+    }
+    updateAdminAuthUI();
+  }
+
+  function updateAdminAuthUI() {
+    const loginView = document.getElementById('adminLoginView');
+    const loggedInView = document.getElementById('adminLoggedInView');
+    if (state.isAuthenticated) {
+      loginView.style.display = 'none';
+      loggedInView.style.display = 'block';
+      document.getElementById('adminDisplayName').textContent = state.adminUser;
+      document.getElementById('appsScriptUrlInput').value = state.scriptUrl;
+      updateSyncStatusUI();
+      renderAdminTable();
+    } else {
+      loginView.style.display = 'flex';
+      loggedInView.style.display = 'none';
+    }
+  }
+
+  function renderAdminTable() {
+    const all = state.allColonies;
+
+    // Populate Circle filter + Add Colony datalist
+    const uniqueCircles = Array.from(new Set(all.map((r) => r.circle).filter((c) => c && c !== '-'))).sort();
+    const circleFilterEl = document.getElementById('adminCircleFilter');
+    const currentCircle = state.adminFilters.circle;
+    circleFilterEl.innerHTML = `<option value="ALL">All Circles (${uniqueCircles.length})</option>` +
+      uniqueCircles.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    circleFilterEl.value = uniqueCircles.includes(currentCircle) ? currentCircle : 'ALL';
+
+    const datalist = document.getElementById('circlesDatalist');
+    if (datalist) {
+      datalist.innerHTML = uniqueCircles.map((c) => `<option value="${escapeHtml(c)}"></option>`).join('');
+    }
+
+    // Filter rows
+    const q = state.adminFilters.search.toLowerCase();
+    const stFilter = state.adminFilters.status;
+    const cFilter = state.adminFilters.circle;
+
+    let filtered = all.filter((r) => {
+      if (stFilter !== 'ALL' && (r.status || '').toUpperCase() !== stFilter) return false;
+      if (cFilter !== 'ALL' && r.circle !== cFilter) return false;
+      if (!q) return true;
+      return `${r.sno} ${r.circle} ${r.ward} ${r.colony} ${r.status} ${r.reason}`.toLowerCase().includes(q);
+    });
+
+    // Sort rows
+    const { key, dir } = state.adminSort;
+    const mult = dir === 'asc' ? 1 : -1;
+    filtered.sort((a, b) => {
+      if (key === 'sno' || key === 'row' || key === 'dashboardCount' || key === 'finalCount') {
+        const na = Number(a[key]) || 0;
+        const nb = Number(b[key]) || 0;
+        return (na - nb) * mult;
+      }
+      return String(a[key] || '').localeCompare(String(b[key] || '')) * mult;
+    });
+
+    // Update 6 Pastel Summary Boxes (Matching Image 2!)
+    const totalFinal = filtered.reduce((s, r) => s + (Number(r.finalCount) || 0), 0);
+    const completedCount = filtered.filter((r) => (r.status || '').toUpperCase() === 'COMPLETED').length;
+    const progressCount = filtered.filter((r) => (r.status || '').toUpperCase() === 'PROGRESS').length;
+    const holdCount = filtered.filter((r) => (r.status || '').toUpperCase() === 'HOLD').length;
+    const noFinalCount = filtered.filter((r) => (r.status || '').toUpperCase() === 'REJECTED' || !(Number(r.finalCount) > 0)).length;
+
+    document.getElementById('adminStatTotal').textContent = formatIndianNumber(filtered.length);
+    document.getElementById('adminStatFinalized').textContent = formatIndianNumber(totalFinal);
+    document.getElementById('adminStatCompleted').textContent = formatIndianNumber(completedCount);
+    document.getElementById('adminStatProgress').textContent = formatIndianNumber(progressCount);
+    document.getElementById('adminStatHold').textContent = formatIndianNumber(holdCount);
+    document.getElementById('adminStatNoFinal').textContent = formatIndianNumber(noFinalCount);
+
+    document.getElementById('adminTableCountInfo').textContent = `Showing ${filtered.length} of ${all.length} Google Sheet records (COLONIES)`;
+
+    const tbody = document.getElementById('adminTableBody');
+    tbody.innerHTML = filtered.map((r) => {
+      const st = (r.status || 'HOLD').toUpperCase();
+      const validSt = ['COMPLETED', 'PROGRESS', 'HOLD', 'REJECTED'].includes(st) ? st : 'HOLD';
+      const pendingTag = r._pendingSync ? ' <span title="Pending push to Google Sheet" style="color:#d97706;font-size:10px;">●</span>' : '';
+      return `
+        <tr data-row="${escapeHtml(r.row)}">
+          <td><strong>${escapeHtml(r.sno || r.row)}</strong>${pendingTag}</td>
+          <td>${escapeHtml(r.circle)}</td>
+          <td>${escapeHtml(r.ward)}</td>
+          <td><strong>${escapeHtml(r.colony)}</strong></td>
+          <td class="num">
+            <input type="number" class="inline-num-input js-dash" value="${Number(r.dashboardCount) || 0}" min="0" aria-label="Dashboard Count" />
+          </td>
+          <td>
+            <input type="date" class="inline-date-input js-date" value="${escapeHtml(r.date || '')}" aria-label="Alloted Date" />
+          </td>
+          <td class="center">
+            <select class="inline-status-select status-${validSt} js-status" aria-label="Status">
+              <option value="COMPLETED" ${validSt === 'COMPLETED' ? 'selected' : ''}>COMPLETED</option>
+              <option value="PROGRESS" ${validSt === 'PROGRESS' ? 'selected' : ''}>PROGRESS</option>
+              <option value="HOLD" ${validSt === 'HOLD' ? 'selected' : ''}>HOLD</option>
+              <option value="REJECTED" ${validSt === 'REJECTED' ? 'selected' : ''}>REJECTED</option>
+            </select>
+          </td>
+          <td>
+            <input type="number" class="inline-num-input js-final" value="${Number(r.finalCount) || 0}" min="0" aria-label="Finalized Count" />
+          </td>
+          <td>
+            <input type="text" class="inline-text-input js-reason" value="${escapeHtml(r.reason || '')}" placeholder="Reason / remarks" aria-label="Reason" />
+          </td>
+          <td class="center">
+            <button type="button" class="row-save-btn js-save-row">Save</button>
+          </td>
+        </tr>
+      `;
+    }).join('') || `<tr><td colspan="10" class="center" style="padding:20px;">No matching colony records found</td></tr>`;
+  }
+
+  async function handleAdminRowSave(tr, btn) {
+    const rowId = tr.getAttribute('data-row');
+    const record = state.allColonies.find((r) => String(r.row) === String(rowId));
+    if (!record) return;
+
+    const newDash = parseNumeric(tr.querySelector('.js-dash').value);
+    const newDate = tr.querySelector('.js-date').value;
+    const newStatus = tr.querySelector('.js-status').value.toUpperCase();
+    const newFinal = parseNumeric(tr.querySelector('.js-final').value);
+    const newReason = tr.querySelector('.js-reason').value.trim();
+
+    const updatedFields = {
+      row: record.row,
+      sno: record.sno,
+      circle: record.circle,
+      ward: record.ward,
+      colony: record.colony,
+      date: newDate,
+      status: newStatus,
+      dashboardCount: newDash,
+      finalCount: newFinal,
+      dashboardRaw: String(newDash),
+      finalRaw: String(newFinal),
+      reason: newReason
+    };
+
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    // Update in-memory state immediately so Dashboard & Admin refresh right away
+    Object.assign(record, updatedFields);
+
+    const result = await writeToGoogleSheet('updateRow', { data: updatedFields });
+
+    if (result && result.ok) {
+      delete record._pendingSync;
+      delete state.pendingEdits[String(record.row)];
+      savePendingEdits();
+      showToast(`Row #${record.row} (${record.colony}) saved to Google Sheet & Dashboard!`, 'success');
+    } else if (result && result.needsSetup) {
+      record._pendingSync = true;
+      state.pendingEdits[String(record.row)] = updatedFields;
+      savePendingEdits();
+      showToast(`Updated in Dashboard! Connect Apps Script URL in "Excel 2-Way Sync Setup" to push to Google Sheet.`, 'warn');
+    } else {
+      record._pendingSync = true;
+      state.pendingEdits[String(record.row)] = updatedFields;
+      savePendingEdits();
+      showToast(`Saved locally; Google Sheet write error: ${(result && result.error) || 'Network issue'}`, 'error');
+    }
+
+    tr.classList.remove('row-dirty');
+    btn.classList.remove('dirty');
+    btn.disabled = false;
+    btn.textContent = 'Save';
+
+    updateSyncStatusUI();
+    renderAll();
+  }
+
+  async function handlePushPendingAll() {
+    const entries = Object.values(state.pendingEdits);
+    if (!entries.length) return;
+
+    if (!isWriteConnected()) {
+      switchAdminSubTab('sync');
+      showToast('Paste and connect your Google Apps Script URL first to push pending edits.', 'warn');
+      return;
+    }
+
+    const pushBtn = document.getElementById('btnPushPendingAll');
+    pushBtn.disabled = true;
+
+    let okCount = 0;
+    const updates = entries.filter((e) => !e._isNew);
+    const additions = entries.filter((e) => e._isNew);
+
+    if (updates.length) {
+      const res = await writeToGoogleSheet('bulkUpdate', { items: updates });
+      if (res && res.ok) okCount += updates.length;
+    }
+
+    for (const addItem of additions) {
+      const res = await writeToGoogleSheet('addRow', { data: addItem });
+      if (res && res.ok) okCount += 1;
+    }
+
+    pushBtn.disabled = false;
+
+    if (okCount === entries.length) {
+      state.pendingEdits = {};
+      savePendingEdits();
+      showToast(`Successfully pushed ${okCount} pending changes to Google Sheet!`, 'success');
+      await fetchLiveSheetData(true);
+    } else {
+      showToast(`Pushed ${okCount}/${entries.length} changes. Check your Apps Script deployment.`, 'warn');
+    }
+  }
+
+  /* ==========================================================================
+     Navigation & Exports
+     ========================================================================== */
+
+  function switchView(viewName) {
+    state.activeView = viewName;
+    document.querySelectorAll('.view-tab-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-view') === viewName);
+    });
+    document.querySelectorAll('.view-section').forEach((sec) => {
+      sec.classList.toggle('active', sec.id === `view-${viewName}`);
+    });
+    if (viewName === 'circle') renderCircleWise();
+    if (viewName === 'admin') updateAdminAuthUI();
+  }
+
+  function switchAdminSubTab(tabName) {
+    state.activeAdminSubTab = tabName;
+    document.querySelectorAll('.admin-subtab').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-admintab') === tabName);
+    });
+    document.getElementById('adminSubColonies').style.display = tabName === 'colonies' ? 'block' : 'none';
+    document.getElementById('adminSubSync').style.display = tabName === 'sync' ? 'block' : 'none';
+  }
+
+  function exportCSV() {
+    const rows = getActiveRecords();
+    const headers = ['SNO', 'CIRCLE', 'WARD', 'COLONY', 'ALLOTED DATE', 'COLONY STATUS', 'PROPERTIES COUNT (DASHBOARD)', 'PROPERTIES COUNT (FINAL)', 'REASON'];
+    const lines = [headers.join(',')];
+    rows.forEach((r) => {
+      const vals = [r.sno, r.circle, r.ward, r.colony, r.date, r.status, r.dashboardCount, r.finalCount, r.reason];
+      lines.push(vals.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','));
+    });
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `GHMC_Colonies_${state.activeSource}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${rows.length} records to CSV`, 'success');
+  }
+
+  function exportExcel() {
+    if (typeof XLSX === 'undefined') {
+      showToast('Excel library is still loading. Try CSV export or retry.', 'warn');
+      return;
+    }
+    const rows = getActiveRecords().map((r) => ({
+      SNO: r.sno,
+      CIRCLE: r.circle,
+      WARD: r.ward,
+      COLONY: r.colony,
+      'ALLOTED DATE': r.date,
+      'COLONY STATUS': r.status,
+      'PROPERTIES COUNT (DASHBOARD)': r.dashboardCount,
+      'PROPERTIES COUNT (FINAL)': r.finalCount,
+      REASON: r.reason
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'COLONIES');
+    XLSX.writeFile(wb, `GHMC_Colonies_${state.activeSource}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showToast(`Exported ${rows.length} records to Excel (.xlsx)`, 'success');
+  }
+
+  /* ==========================================================================
+     Event Wiring & Boot
+     ========================================================================== */
+
+  function startAutoSync() {
+    if (state.autoSyncTimer) clearInterval(state.autoSyncTimer);
+    state.autoSyncTimer = setInterval(() => {
+      const toggle = document.getElementById('autoSyncToggle');
+      if (!toggle || !toggle.checked) return;
+      // Don't interrupt admin while actively editing an input cell
+      const activeTag = document.activeElement && document.activeElement.tagName;
+      if (state.activeView === 'admin' && ['INPUT', 'SELECT', 'TEXTAREA'].includes(activeTag)) return;
+      if (document.querySelector('#adminTableBody tr.row-dirty')) return;
+      fetchLiveSheetData(true);
+    }, CONFIG.autoSyncMs);
+  }
+
+  function setupEvents() {
+    // Primary Source Tabs
+    document.querySelectorAll('.primary-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.activeSource = btn.getAttribute('data-source');
+        document.querySelectorAll('.primary-tab').forEach((b) => b.classList.toggle('active', b === btn));
+        renderAll();
+      });
+    });
+
+    // Secondary View Tabs
+    document.querySelectorAll('.view-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
+    });
+
+    document.getElementById('btnQuickGoAdmin').addEventListener('click', () => switchView('admin'));
+
+    // Management Tools
+    document.getElementById('btnRefreshData').addEventListener('click', () => fetchLiveSheetData(false));
+    document.getElementById('btnExportCsv').addEventListener('click', exportCSV);
+    document.getElementById('btnExportXlsx').addEventListener('click', exportExcel);
+    document.getElementById('btnPrintPdf').addEventListener('click', () => window.print());
+
+    // Date Wise controls
+    document.getElementById('dateWiseSelect').addEventListener('change', (e) => {
+      state.dateWiseSelected = e.target.value;
+      renderDateWise();
+    });
+    document.getElementById('btnShowAllDates').addEventListener('click', () => {
+      state.dateWiseSelected = 'ALL';
+      renderDateWise();
+    });
+
+    // Circle Wise controls
+    document.getElementById('circleSearchInput').addEventListener('input', (e) => {
+      state.circleSearch = e.target.value.trim();
+      renderCircleWise();
+    });
+    document.getElementById('circleFilterSelect').addEventListener('change', (e) => {
+      state.circleFilter = e.target.value;
+      renderCircleWise();
+    });
+    document.getElementById('btnCloseDrilldown').addEventListener('click', () => {
+      state.selectedDrilldownCircle = null;
+      document.getElementById('circleDrilldownPanel').style.display = 'none';
+    });
+
+    // Admin Login Form (Image 3)
+    document.getElementById('adminLoginForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const user = document.getElementById('loginUsername').value.trim();
+      const pass = document.getElementById('loginPassword').value;
+      const errBox = document.getElementById('loginErrorMsg');
+      const submitBtn = document.getElementById('loginSubmitBtn');
+      const creds = getStoredCreds();
+
+      if (user.toLowerCase() === creds.username.toLowerCase() && pass === creds.password) {
+        errBox.style.display = 'none';
+        submitBtn.textContent = 'Signing in...';
+        submitBtn.disabled = true;
+        setTimeout(() => {
+          state.isAuthenticated = true;
+          state.adminUser = user === 'admin' ? 'Admin' : user;
+          sessionStorage.setItem(CONFIG.storageKeys.adminSession, JSON.stringify({ username: state.adminUser }));
+          submitBtn.textContent = 'Sign In';
+          submitBtn.disabled = false;
+          document.getElementById('loginPassword').value = '';
+          updateAdminAuthUI();
+          showToast(`Signed in as ${state.adminUser}`, 'success');
+        }, 280);
+      } else {
+        errBox.textContent = 'Invalid username or password. Default credentials: admin / admin123';
+        errBox.style.display = 'block';
+      }
+    });
+
+    // Admin Top Bar actions
+    document.getElementById('btnAdminLogout').addEventListener('click', () => {
+      state.isAuthenticated = false;
+      sessionStorage.removeItem(CONFIG.storageKeys.adminSession);
+      updateAdminAuthUI();
+      showToast('Logged out of Admin Dashboard', 'info');
+    });
+
+    document.getElementById('btnAdminRefresh').addEventListener('click', () => fetchLiveSheetData(false));
+    document.getElementById('btnAdminSyncTab').addEventListener('click', () => switchAdminSubTab('sync'));
+    document.getElementById('btnGoSyncSetup').addEventListener('click', () => switchAdminSubTab('sync'));
+    document.getElementById('btnPushPendingAll').addEventListener('click', handlePushPendingAll);
+
+    // Admin Sub-tabs
+    document.querySelectorAll('.admin-subtab').forEach((btn) => {
+      btn.addEventListener('click', () => switchAdminSubTab(btn.getAttribute('data-admintab')));
+    });
+
+    // Admin Filters
+    document.getElementById('adminSearchInput').addEventListener('input', (e) => {
+      state.adminFilters.search = e.target.value.trim();
+      renderAdminTable();
+    });
+    document.getElementById('adminStatusFilter').addEventListener('change', (e) => {
+      state.adminFilters.status = e.target.value;
+      renderAdminTable();
+    });
+    document.getElementById('adminCircleFilter').addEventListener('change', (e) => {
+      state.adminFilters.circle = e.target.value;
+      renderAdminTable();
+    });
+
+    // Admin Table Sorting
+    document.querySelectorAll('#adminColoniesTable thead th.sortable').forEach((th) => {
+      th.addEventListener('click', () => {
+        const key = th.getAttribute('data-sort');
+        if (state.adminSort.key === key) {
+          state.adminSort.dir = state.adminSort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.adminSort.key = key;
+          state.adminSort.dir = 'asc';
+        }
+        renderAdminTable();
+      });
+    });
+
+    // Admin Inline Table Delegation (Status pill live styling + Row Save)
+    const adminTbody = document.getElementById('adminTableBody');
+    adminTbody.addEventListener('change', (e) => {
+      const tr = e.target.closest('tr');
+      if (!tr) return;
+      if (e.target.classList.contains('js-status')) {
+        const val = e.target.value;
+        e.target.className = `inline-status-select status-${val} js-status`;
+      }
+      tr.classList.add('row-dirty');
+      const saveBtn = tr.querySelector('.js-save-row');
+      if (saveBtn) saveBtn.classList.add('dirty');
+    });
+
+    adminTbody.addEventListener('input', (e) => {
+      const tr = e.target.closest('tr');
+      if (!tr) return;
+      tr.classList.add('row-dirty');
+      const saveBtn = tr.querySelector('.js-save-row');
+      if (saveBtn) saveBtn.classList.add('dirty');
+    });
+
+    adminTbody.addEventListener('click', (e) => {
+      const btn = e.target.closest('.js-save-row');
+      if (!btn) return;
+      const tr = btn.closest('tr');
+      handleAdminRowSave(tr, btn);
+    });
+
+    // Sync Settings Save / Test / Clear
+    document.getElementById('btnTestSaveScriptUrl').addEventListener('click', async () => {
+      const url = document.getElementById('appsScriptUrlInput').value.trim();
+      if (!url || !url.startsWith('https://script.google.com/')) {
+        showToast('Please enter a valid Google Apps Script Web App URL (https://script.google.com/macros/s/.../exec)', 'error');
+        return;
+      }
+      state.scriptUrl = url;
+      localStorage.setItem(CONFIG.storageKeys.scriptUrl, url);
+      showToast('Testing connection to Google Apps Script...', 'info');
+      const res = await writeToGoogleSheet('ping', {});
+      if (res && res.ok) {
+        showToast('Connected! Two-way sync with Google Sheet is now LIVE!', 'success');
+        updateSyncStatusUI();
+        await fetchLiveSheetData(true);
+      } else {
+        showToast(`Could not verify Apps Script URL: ${(res && res.error) || 'Ensure deployment access is set to Anyone.'}`, 'error');
+        updateSyncStatusUI();
+      }
+    });
+
+    document.getElementById('btnClearScriptUrl').addEventListener('click', () => {
+      state.scriptUrl = '';
+      localStorage.removeItem(CONFIG.storageKeys.scriptUrl);
+      document.getElementById('appsScriptUrlInput').value = '';
+      updateSyncStatusUI();
+      showToast('Disconnected local Apps Script URL', 'info');
+    });
+
+    document.getElementById('btnCopyAppsScript').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(APPS_SCRIPT_SNIPPET);
+        showToast('Copied Code.gs script to clipboard!', 'success');
+      } catch {
+        showToast('Select and copy the script from the code box below.', 'info');
+      }
+    });
+
+    // Modals (Add Colony & Change Password)
+    document.querySelectorAll('[data-close-modal]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.getElementById(btn.getAttribute('data-close-modal')).classList.remove('open');
+      });
+    });
+
+    document.getElementById('btnOpenAddColony').addEventListener('click', () => {
+      document.getElementById('newDate').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('addColonyModal').classList.add('open');
+    });
+
+    document.getElementById('addColonyForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = document.getElementById('btnSubmitNewColony');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
+
+      const maxRow = state.allColonies.reduce((m, r) => Math.max(m, Number(r.row) || 0), 1);
+      const maxSno = state.allColonies.reduce((m, r) => Math.max(m, parseInt(r.sno, 10) || 0), 0);
+
+      const newColony = {
+        row: maxRow + 1,
+        sno: String(maxSno + 1),
+        circle: document.getElementById('newCircle').value.trim().toUpperCase(),
+        ward: document.getElementById('newWard').value.trim().toUpperCase(),
+        colony: document.getElementById('newColony').value.trim().toUpperCase(),
+        date: document.getElementById('newDate').value,
+        status: document.getElementById('newStatus').value.toUpperCase(),
+        dashboardCount: parseNumeric(document.getElementById('newDashboardCount').value),
+        finalCount: parseNumeric(document.getElementById('newFinalCount').value),
+        reason: document.getElementById('newReason').value.trim()
+      };
+
+      const res = await writeToGoogleSheet('addRow', { data: newColony });
+
+      if (res && res.ok) {
+        if (res.row) newColony.row = res.row;
+        if (res.sno) newColony.sno = String(res.sno);
+        state.allColonies.push(newColony);
+        showToast(`Colony "${newColony.colony}" added to Google Sheet (Row #${newColony.row}) & Dashboard!`, 'success');
+      } else {
+        newColony._pendingSync = true;
+        newColony._isNew = true;
+        state.allColonies.push(newColony);
+        state.pendingEdits[String(newColony.row)] = newColony;
+        savePendingEdits();
+        showToast(`Added "${newColony.colony}" to Dashboard! Connect Apps Script URL to push to Google Sheet.`, 'warn');
+      }
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Save to Excel & Dashboard';
+      document.getElementById('addColonyForm').reset();
+      document.getElementById('addColonyModal').classList.remove('open');
+      updateSyncStatusUI();
+      renderAll();
+    });
+
+    document.getElementById('btnOpenChangePwd').addEventListener('click', () => {
+      document.getElementById('changePwdModal').classList.add('open');
+    });
+
+    document.getElementById('changePwdForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const cur = document.getElementById('curPwd').value;
+      const np = document.getElementById('newPwd').value;
+      const cp = document.getElementById('confirmPwd').value;
+      const creds = getStoredCreds();
+
+      if (cur !== creds.password) {
+        showToast('Current password is incorrect.', 'error');
+        return;
+      }
+      if (np !== cp) {
+        showToast('New passwords do not match.', 'error');
+        return;
+      }
+      localStorage.setItem(CONFIG.storageKeys.adminCreds, JSON.stringify({ username: creds.username, password: np }));
+      document.getElementById('changePwdForm').reset();
+      document.getElementById('changePwdModal').classList.remove('open');
+      showToast('Admin password updated successfully!', 'success');
+    });
+  }
+
+  function init() {
+    document.getElementById('appsScriptPreview').textContent = APPS_SCRIPT_SNIPPET;
+
+    // Paint immediately from embedded snapshot so there is zero blank flash
+    if (window.GHMC_INITIAL_DATA && Array.isArray(window.GHMC_INITIAL_DATA.colonies)) {
+      state.allColonies = mergePendingEdits(window.GHMC_INITIAL_DATA.colonies);
+      state.lastSyncedAt = new Date();
+    }
+
+    restoreAdminSession();
+    setupEvents();
+    updateSyncStatusUI();
+    renderAll();
+
+    // Immediately pull live data from Google Sheet
+    fetchLiveSheetData(true);
+    startAutoSync();
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();

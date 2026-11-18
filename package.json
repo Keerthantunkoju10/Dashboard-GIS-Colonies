@@ -1,0 +1,12 @@
+{
+  "name": "ghmc-colony-performance-dashboard",
+  "version": "2.0.0",
+  "description": "NeoGeo GHMC Project Colony Performance Management Dashboard with Live Two-Way Google Sheets Admin Integration (GitHub + Netlify ready).",
+  "scripts": {
+    "dev": "npx netlify-cli dev",
+    "serve": "python -m http.server 8080"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

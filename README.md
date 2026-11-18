@@ -1,114 +1,99 @@
-# NeoGeo GHMC Project Colony Survey & GIS Delivery Management Dashboard
+# NeoGeo — GHMC Project Colony Performance Management Dashboard
 
-An executive, high-fidelity corporate analytics dashboard engineered for the **GHMC Project (Greater Hyderabad Municipal Corporation)** by **NeoGeoinfo Technologies Limited**.
+Live executive colony analytics dashboard & Excel-linked Admin Suite built for **NeoGeoinfo Technologies Limited (GHMC Project)**, directly integrated with the Google Sheet:
 
-This platform matches the production interface from your reference images and is integrated with the official Google Sheet database, with automated colony de-duplication, circle delivery analytics, Admin Suite authentication, and **Real-Time Push to Excel** (**completely focused on Colonies, Circles, Wards, and GIS delivery without employee metrics**).
-
----
-
-## 🌟 Key Features
-
-### 1. Executive Colony Survey Dashboard (Matches Reference Images)
-* **NeoGeo Corporate Header**: Official branding, live clock updater, active sync indicator, and user profile badge.
-* **Primary Navigation Tabs**:
-  * `1. Fresh Data (Current GHMC dashboard & surveyed colonies)`
-  * `2. Resubmit Data (Hold & re-surveyed colonies)`
-  * `3. 3Layers Data (Colony delivery & GIS layers)`
-* **High-Level Metric Cards**:
-  * **Total GHMC Properties**: `19,81,000` (All 300 GHMC Wards)
-  * **Submitted to GHMC**: `11,72,901` (59.2%)
-  * **Last Submitted Date**: `13-Nov-2026`
-  * **Ready to Submit**: `26,083` (Highlighted emerald badge)
-* **Overall Survey Performance Banner & 7 KPI Cards**:
-  * Raw Colonies: `158`
-  * Clean Deduplicated Colonies: `93`
-  * Completed Colonies: `70`
-  * Colonies on Hold: `22`
-  * Dashboard Properties Target: `26,420`
-  * Final Verified Properties: `18,867`
-  * Overall Completion Rate: `75.3%`
-* **Task Completion Gauge**: `75.3%` with animated dual-gradient progress bar.
-* **Performance Comparison Tables**:
-  * **★ Top 3 Performing Circles**: Circle 21-CHANDA NAGAR (100%), Circle 13-KARWAN (100%), Circle 23-MOOSAPET (100%)
-  * **▼ Least 3 / Lagging Circles**: Circle 7-SANTOSH NAGAR (0.0%), Circle 18-JUBLEEHILLS (0.0%), Circle 28-MALKAJGIRI (0.0%)
-* **Interactive Responsive Charts**:
-  * **Daily Properties Target (Dashboard) vs Finalized**: Dual bar timeline chart across all active survey dates from Google Sheets.
-  * **Circle-Wise Colony Delivery & Completion %**: Color-scaled bar chart across all active GHMC circles matching the screenshot palette.
+- **Linked Google Sheet**: `https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit?usp=sharing`
+- **Active Sheet Tab**: `COLONIES`
+- **Employee-free Analytics**: Focuses exclusively on **Colonies, Circles, Wards, Property Counts, and Statuses** (`COMPLETED`, `PROGRESS`, `HOLD`, `REJECTED`).
 
 ---
 
-### 2. Real-Time Excel Push Engine ("Whenever I upload a colony it should push in Excel also")
-* **Automatic Excel Workbook Integration**:
-  * Whenever a new colony is uploaded or added via the dashboard modal, it is **immediately pushed and appended directly into `GHMC_Data.xlsx`** on disk via the dedicated backend API (`POST /api/save-colony`).
-  * If a colony already exists (matching SNO or Circle + Colony Name), the record is updated in place in `GHMC_Data.xlsx`.
-  * If an Excel file (`.xlsx` or `.csv`) is uploaded via the drag-and-drop zone, the bulk push endpoint (`POST /api/save-colonies-bulk`) writes all colonies to `GHMC_Data.xlsx` in a single batch.
-  * After every Excel update, `dashboard_data.json` and `data.js` are regenerated automatically.
-* **Instant Toast Notification**:
-  * Visual confirmation toasts appear instantly: `"✓ Colony '<Colony Name>' successfully pushed to GHMC_Data.xlsx (Row <Row Number>)!"`.
-* **One-Click Clean Excel Export**:
-  * Direct download of the cleaned, deduplicated dataset as an Excel workbook (`.xlsx`) at any time.
+## Features
+
+1. **Public Executive Dashboard**
+   - Corporate NeoGeo header, **1. Fresh Data / 2. Resubmit Data / 3. 3Layers Data** tabs, 4 executive KPI cards, 7 mini KPI cards, Task Completion gauge, **Top 3 & Least 3 Performing Circles**, and interactive **Daily Target vs Finalized** & **Circle Achievement %** charts.
+   - Drill-down views: **Overview**, **Month Wise**, **Week Wise**, **Date Wise**, and **Circle Wise** (with expandable Colony list).
+   - Export to **CSV**, **Excel (`.xlsx`)**, and **Print / PDF**.
+   - **Auto-Sync (every 30s)** + manual **Refresh Data** pulls live edits made directly in Google Sheets.
+
+2. **Admin / QC Work Dashboard (Live Two-Way Excel Integration)**
+   - Secure login screen (**Default credentials**: `admin` / `admin123`, changeable inside Admin via **Change Password**).
+   - Public dashboard stays open to everyone; login is only required for colony editing and Google Sheet write-back.
+   - **6 pastel summary cards** (`Total Records`, `Finalized Count`, `Completed`, `In Progress`, `Hold`, `Rejected / No Final`).
+   - **Full inline-editable table** of every row in Google Sheets (`COLONIES`): update **Status**, **Dashboard Count**, **Finalized Count**, **Alloted Date**, or **Reason** and click **Save** to update BOTH the Google Sheet and the Dashboard immediately.
+   - **+ Add Colony** modal appends new colonies directly into the next open row of the `COLONIES` sheet.
 
 ---
 
-### 3. Colony De-duplication Engine ("Remove the Duplicate")
-* **Raw Dataset**: 158 field survey records from the `COLONIES` sheet.
-* **Duplicate Detection**: Automatically identifies 43 duplicate colony groups involving 108 records where colonies were re-visited or logged across multiple dates (e.g., *Vanasthali Hills* with 5 records, *Balaji Nagar* with 4 records, *Erragadda Main Road* with 4 records).
-* **Consolidation**:
-  * Produces **93 clean unique master colony records**.
-  * Retains the latest survey date record with verified final property count.
-  * Preserves historical field notes and reasons.
-* **De-duplication Center View**:
-  * Visual side-by-side inspector showing all 43 duplicate groups.
-  * Green badge highlights the retained master record while redundant rows are flagged.
-  * One-click download of **Clean Deduplicated Excel (.xlsx)** and **Clean Deduplicated CSV**.
+## 1. Deploy to GitHub & Netlify
+
+### Option A — Deploy via GitHub + Netlify (Recommended)
+1. Unzip `ghmc-colony-dashboard-netlify.zip` (or use the `ghmc-colony-dashboard` folder).
+2. Create a new repository on GitHub (e.g., `ghmc-colony-dashboard`) and push the files:
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit: NeoGeo GHMC Colony Dashboard + Admin 2-Way Excel Sync"
+   git branch -M main
+   git remote add origin https://github.com/<your-username>/ghmc-colony-dashboard.git
+   git push -u origin main
+   ```
+3. Go to [app.netlify.com](https://app.netlify.com) → **Add new site → Import an existing project → GitHub** → select your repository.
+4. Keep the detected defaults from `netlify.toml`:
+   - **Build command**: *(leave empty)*
+   - **Publish directory**: `.`
+   - **Functions directory**: `netlify/functions`
+5. Click **Deploy site**.
+
+### Option B — Quick Drag-and-Drop to Netlify
+- Go to **Netlify → Sites → Add new site → Deploy manually**, and drag the unzipped `ghmc-colony-dashboard` folder (note: for Netlify Functions `/api/sheet-sync` to be deployed cleanly, **Option A via GitHub** or `netlify deploy --prod` is recommended; even without functions, the dashboard automatically falls back to direct Google Sheets live fetch & direct Apps Script sync!).
 
 ---
 
-### 4. Admin Authentication Modal (Matches Reference Image)
-* **Pixel-Perfect QC Work Modal**:
-  * Exact replica of the reference screenshot (`QC WORK LOGIN` / `Employee / Admin Login`).
-  * Features the animated rainbow gradient accent bar, floating pill badge, clear instructional text, and styled blue action button.
-* **Refresh-Based Session Security**:
-  * The main public dashboard (KPIs, overview charts, Circle Wise, Ward Wise, Date Wise, and Deduplication views) remains open to all viewers.
-  * The Admin Management Suite and Colony modification capabilities require authentication.
-  * **Session reset on page reload**: Re-authentication is required every time the page is refreshed (no persistent session storage across reloads).
+## 2. Enable Live Two-Way Write-Back (Admin Dashboard → Google Sheet)
+
+Reading from your Google Sheet works **automatically out-of-the-box** (any edit made in Google Sheets appears automatically in the Dashboard & Admin Dashboard).
+
+To also push **Admin Dashboard status/count edits BACK into Google Sheets** (60-second one-time setup):
+
+1. Open your Google Sheet:  
+   `https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit`
+2. Click **Extensions → Apps Script**.
+3. Delete any existing code in `Code.gs` and paste the contents of `google-apps-script/Code.gs`.
+4. Click **Save** (`Ctrl+S`).
+5. Click **Deploy → New deployment → Select type: Web app**:
+   - **Execute as**: `Me`
+   - **Who has access**: `Anyone`
+6. Click **Deploy**, authorize permissions, and copy the **Web app URL** (ends with `/exec`).
+7. Connect the URL using **either** method:
+   - **Global (All Admins on Netlify)**: In Netlify → **Site configuration → Environment variables**, add:
+     - Key: `GOOGLE_APPS_SCRIPT_URL`
+     - Value: `https://script.google.com/macros/s/.../exec`
+     - Trigger a quick redeploy.
+   - **Instant (In Browser)**: Sign into **Admin / QC Work** (`admin` / `admin123`) → open **Excel 2-Way Sync Setup** → paste the Web App URL → click **Test & Connect**.
+
+Now:
+- **Edit a status in Google Sheets** → Dashboard & Admin Dashboard reflect it automatically (on Refresh or within 30 seconds).
+- **Edit a status / finalized count in Admin Dashboard & click Save** → Google Sheet & Dashboard both update immediately!
 
 ---
 
-### 5. Two-Way Google Sheets Sync
-* **Connected Google Sheet**:
-  * `https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit?usp=sharing`
-* **Sync Live from Google Sheets**:
-  * Pulls live data from the Google Sheet link with 1 click.
-* **Google Apps Script Webhook Snippet**:
-  * Provides ready-to-use Google Apps Script code for 2-way sync between Google Drive and the dashboard.
+## Project Structure
 
----
-
-## 🚀 How to Run the Dashboard
-
-### Method 1: One-Click Batch File (Recommended)
-Double-click:
-* `c:\Users\Nikhil\Desktop\Keerthan\Courses\Launch_Dashboard.bat`, OR
-* `c:\Users\Nikhil\Desktop\Keerthan\Courses\Dashboard GIS Colonies\run_dashboard.bat`.
-
-This launches the local Excel integration server on port 3000 and opens `http://localhost:3000` in your default browser.
-
-### Method 2: Direct File Opening
-Double-click `index.html` in `Dashboard GIS Colonies` to open directly in Google Chrome or Microsoft Edge.
-
----
-
-## 📁 File Structure
-```
-Dashboard GIS Colonies/
-├── index.html              # Core application layout, charts, and QC Work modal
-├── styles.css              # Custom NeoGeo corporate styling & animations
-├── app.js                  # Application logic, deduplication engine, and Excel push
-├── server.py               # Dedicated Python backend with openpyxl Excel push engine
-├── data.js                 # Embedded datasets from Excel sheets
-├── dashboard_data.json     # Clean JSON export of all sheets
-├── GHMC_Data.xlsx          # Live Excel workbook pushed to on colony uploads
-├── run_dashboard.bat       # Local server launcher
-└── README.md               # Documentation
+```text
+ghmc-colony-dashboard/
+├── index.html                      # Complete Dashboard & Admin UI
+├── styles.css                      # NeoGeo corporate theme matching reference designs
+├── app.js                          # Analytics engine, live sync, inline Admin editor
+├── data/
+│   └── initial-data.js             # Embedded snapshot from live Google Sheet (fallback)
+├── netlify/
+│   └── functions/
+│       └── sheet-sync.js           # Zero-dependency Netlify Function (GET/POST Google Sheets)
+├── google-apps-script/
+│   └── Code.gs                     # Paste into Google Sheet Apps Script for 2-way write-back
+├── netlify.toml                    # Netlify publish, functions & /api/sheet-sync redirect
+├── package.json                    # Project metadata & dev scripts
+├── .gitignore
+└── README.md
 ```

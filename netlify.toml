@@ -2,17 +2,17 @@
   publish = "."
   functions = "netlify/functions"
 
-[[redirects]]
-  from = "/api/save-colony"
-  to = "/.netlify/functions/save-colony"
-  status = 200
+[functions]
+  node_bundler = "esbuild"
 
 [[redirects]]
-  from = "/api/save-colonies-bulk"
-  to = "/.netlify/functions/save-colonies-bulk"
+  from = "/api/sheet-sync"
+  to = "/.netlify/functions/sheet-sync"
   status = 200
+  force = true
 
 [[headers]]
-  for = "/*"
+  for = "/api/*"
   [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate"
     Access-Control-Allow-Origin = "*"
