@@ -274,7 +274,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 21,
-      "sno": "21",
+      "sno": "20",
       "circle": "2-UPPAL",
       "ward": "8-HABSIGUDA",
       "colony": "SHOBANA NAGAR",
@@ -344,7 +344,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 26,
-      "sno": "26",
+      "sno": "25",
       "circle": "24-KUKATPALLY",
       "ward": "124-ALLYWN COLONY",
       "colony": "PVR SAI DUPLEX",
@@ -498,7 +498,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 37,
-      "sno": "43",
+      "sno": "36",
       "circle": "4-LBNAGAR",
       "ward": "16-HASTHINAPURAM",
       "colony": "VENKATESWARA COLONY",
@@ -554,7 +554,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 41,
-      "sno": "41",
+      "sno": "40",
       "circle": "4-LBNAGAR",
       "ward": "16-HASTHINAPURAM",
       "colony": "VENKATESWARA COLONY",
@@ -582,7 +582,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 43,
-      "sno": "43",
+      "sno": "42",
       "circle": "2-UPPAL",
       "ward": "7-CHILUKA NAGAR",
       "colony": "ANNAPURNA COLONY 1",
@@ -638,7 +638,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 47,
-      "sno": "47",
+      "sno": "46",
       "circle": "4-LBNAGAR",
       "ward": "15-VANASTHALIPURAM",
       "colony": "VANASTHALI HILLS",
@@ -680,7 +680,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 50,
-      "sno": "47",
+      "sno": "49",
       "circle": "4-LBNAGAR",
       "ward": "15-VANASTHALIPURAM",
       "colony": "VANASTHALI HILLS",
@@ -694,7 +694,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 51,
-      "sno": "47",
+      "sno": "50",
       "circle": "3-HAYAT NAGAR",
       "ward": "13-HAYATHNAGAR",
       "colony": "OTHERS (GHMC) 006",
@@ -708,7 +708,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 52,
-      "sno": "48",
+      "sno": "51",
       "circle": "26-GAJULARAMARAM",
       "ward": "126-JAGADGIRI GUTTA",
       "colony": "SOMAIAH NAGAR",
@@ -722,7 +722,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 53,
-      "sno": "49",
+      "sno": "52",
       "circle": "3-HAYAT NAGAR",
       "ward": "13-HAYATHNAGAR",
       "colony": "OTHERS (GHMC) 006",
@@ -736,7 +736,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 54,
-      "sno": "50",
+      "sno": "53",
       "circle": "28-MALKAJGIRI",
       "ward": "138-MOULA-ALI",
       "colony": "BRUNDHAVAN COLONY",
@@ -750,7 +750,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 55,
-      "sno": "51",
+      "sno": "54",
       "circle": "28-MALKAJGIRI",
       "ward": "138-MOULA-ALI",
       "colony": "BRUNDHAVAN COLONY",
@@ -764,7 +764,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 56,
-      "sno": "52",
+      "sno": "55",
       "circle": "7-SANTOSH NAGAR",
       "ward": "37-KURMAGUDA",
       "colony": "KASHEEM COLONY",
@@ -778,7 +778,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 57,
-      "sno": "53",
+      "sno": "56",
       "circle": "7-SANTOSH NAGAR",
       "ward": "37-KURMAGUDA",
       "colony": "REDDY SANGAM",
@@ -792,7 +792,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 58,
-      "sno": "54",
+      "sno": "57",
       "circle": "7-SANTOSH NAGAR",
       "ward": "37-KURMAGUDA",
       "colony": "REDDY SANGAM",
@@ -806,7 +806,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 59,
-      "sno": "55",
+      "sno": "58",
       "circle": "4-LBNAGAR",
       "ward": "16-HASTHINAPURAM",
       "colony": "DIAMOND COLONY",
@@ -820,7 +820,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 60,
-      "sno": "56",
+      "sno": "59",
       "circle": "4-LBNAGAR",
       "ward": "16-HASTHINAPURAM",
       "colony": "DIAMOND COLONY",
@@ -834,7 +834,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 61,
-      "sno": "57",
+      "sno": "60",
       "circle": "3-HAYAT NAGAR",
       "ward": "13-HAYATHNAGAR",
       "colony": "SATYA NAGAR",
@@ -848,7 +848,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 62,
-      "sno": "58",
+      "sno": "61",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "BALAJI NAGAR",
@@ -862,7 +862,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 63,
-      "sno": "59",
+      "sno": "62",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "BALAJI NAGAR",
@@ -876,7 +876,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 64,
-      "sno": "60",
+      "sno": "63",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "NALLAKUNTA STREET NO 12",
@@ -890,7 +890,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 65,
-      "sno": "61",
+      "sno": "64",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "NALLAKUNTA STREET NO 12",
@@ -904,7 +904,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 66,
-      "sno": "62",
+      "sno": "65",
       "circle": "3-HAYAT NAGAR",
       "ward": "13-HAYATHNAGAR",
       "colony": "BLOSSOM CITY",
@@ -918,7 +918,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 67,
-      "sno": "63",
+      "sno": "66",
       "circle": "3-HAYAT NAGAR",
       "ward": "13-HAYATHNAGAR",
       "colony": "GJR COLONY",
@@ -932,7 +932,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 68,
-      "sno": "64",
+      "sno": "67",
       "circle": "3-HAYAT NAGAR",
       "ward": "13-HAYATHNAGAR",
       "colony": "GREENWOOD COLONY",
@@ -946,7 +946,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 69,
-      "sno": "65",
+      "sno": "68",
       "circle": "3-HAYAT NAGAR",
       "ward": "13-HAYATHNAGAR",
       "colony": "GJR COLONY",
@@ -960,7 +960,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 70,
-      "sno": "66",
+      "sno": "69",
       "circle": "-",
       "ward": "115-BALAJI NAGAR",
       "colony": "-",
@@ -974,7 +974,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 71,
-      "sno": "67",
+      "sno": "70",
       "circle": "26-GAJULARAMARAM",
       "ward": "126-JAGADGIRI GUTTA",
       "colony": "SOMAIAH NAGAR",
@@ -988,7 +988,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 72,
-      "sno": "68",
+      "sno": "71",
       "circle": "3-HAYAT NAGAR",
       "ward": "13-HAYATHNAGAR",
       "colony": "BLOSSOM CITY",
@@ -1002,7 +1002,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 73,
-      "sno": "69",
+      "sno": "72",
       "circle": "3-HAYAT NAGAR",
       "ward": "13-HAYATHNAGAR",
       "colony": "GJR COLONY",
@@ -1016,7 +1016,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 74,
-      "sno": "70",
+      "sno": "73",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "TRT COLONY",
@@ -1030,7 +1030,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 75,
-      "sno": "71",
+      "sno": "74",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "TRT COLONY",
@@ -1044,7 +1044,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 76,
-      "sno": "72",
+      "sno": "75",
       "circle": "23-MOOSAPET",
       "ward": "118-FATEH NAGAR",
       "colony": "LBS NAGAR",
@@ -1058,7 +1058,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 77,
-      "sno": "73",
+      "sno": "76",
       "circle": "23-MOOSAPET",
       "ward": "118-FATEH NAGAR",
       "colony": "LBS NAGAR",
@@ -1072,7 +1072,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 78,
-      "sno": "74",
+      "sno": "77",
       "circle": "16-AMBERPET",
       "ward": "79-HIMAYATNAGAR",
       "colony": "HIMAYATH NAGAR ST 19",
@@ -1086,7 +1086,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 79,
-      "sno": "75",
+      "sno": "78",
       "circle": "16-AMBERPET",
       "ward": "79-HIMAYATNAGAR",
       "colony": "HIMAYATH NAGAR ST 19",
@@ -1100,7 +1100,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 80,
-      "sno": "76",
+      "sno": "79",
       "circle": "24-KUKATPALLY",
       "ward": "121-KUKATPALLY",
       "colony": "RAMAIAH NAGAR",
@@ -1114,7 +1114,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 81,
-      "sno": "77",
+      "sno": "80",
       "circle": "20-SERILINGAMPALLY",
       "ward": "104-KONDAPUR",
       "colony": "CYBER HILLS",
@@ -1128,7 +1128,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 82,
-      "sno": "78",
+      "sno": "81",
       "circle": "27-ALWAL",
       "ward": "133-MACHABOLARUM",
       "colony": "VBR COLONY",
@@ -1142,7 +1142,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 83,
-      "sno": "79",
+      "sno": "82",
       "circle": "24-KUKATPALLY",
       "ward": "121-KUKATPALLY",
       "colony": "DEENABANDU COLONY",
@@ -1156,7 +1156,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 84,
-      "sno": "80",
+      "sno": "83",
       "circle": "24-KUKATPALLY",
       "ward": "121-KUKATPALLY",
       "colony": "DEENABANDU COLONY",
@@ -1170,7 +1170,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 85,
-      "sno": "81",
+      "sno": "84",
       "circle": "20-SERILINGAMPALLY",
       "ward": "105-GACHIBOWLI",
       "colony": "FARI LANDS / BONSAI HOMES",
@@ -1184,7 +1184,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 86,
-      "sno": "82",
+      "sno": "85",
       "circle": "21-CHANDA NAGAR",
       "ward": "109-HAFEEZPET",
       "colony": "ENGINEERS ENCLAVE",
@@ -1198,7 +1198,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 87,
-      "sno": "83",
+      "sno": "86",
       "circle": "21-CHANDA NAGAR",
       "ward": "109-HAFEEZPET",
       "colony": "INDRA REDDY ALLWYN COLONY",
@@ -1212,7 +1212,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 88,
-      "sno": "84",
+      "sno": "87",
       "circle": "21-CHANDA NAGAR",
       "ward": "109-HAFEEZPET",
       "colony": "INDRA REDDY ALLWYN COLONY",
@@ -1226,7 +1226,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 89,
-      "sno": "85",
+      "sno": "88",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "CHARY GALLI",
@@ -1240,7 +1240,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 90,
-      "sno": "86",
+      "sno": "89",
       "circle": "21-CHANDA NAGAR",
       "ward": "110-CHANDANAGAR",
       "colony": "SRI RAM NAGAR COLONY",
@@ -1254,7 +1254,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 91,
-      "sno": "87",
+      "sno": "90",
       "circle": "21-CHANDA NAGAR",
       "ward": "110-CHANDANAGAR",
       "colony": "SRI RAM NAGAR COLONY",
@@ -1268,7 +1268,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 92,
-      "sno": "88",
+      "sno": "91",
       "circle": "20-SERILINGAMPALLY",
       "ward": "105-GACHIBOWLI",
       "colony": "VAJRAM ASTER HOMES",
@@ -1282,7 +1282,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 93,
-      "sno": "89",
+      "sno": "92",
       "circle": "24-KUKATPALLY",
       "ward": "123-HYDER NAGAR",
       "colony": "LAKE VIEW COLONY",
@@ -1296,7 +1296,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 94,
-      "sno": "90",
+      "sno": "93",
       "circle": "24-KUKATPALLY",
       "ward": "123-HYDER NAGAR",
       "colony": "LAKE VIEW COLONY",
@@ -1310,7 +1310,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 95,
-      "sno": "91",
+      "sno": "94",
       "circle": "11-RAJENDRANAGAR",
       "ward": "60-RAJENDRANAGAR",
       "colony": "AMBEDKER NAGAR",
@@ -1324,7 +1324,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 96,
-      "sno": "92",
+      "sno": "95",
       "circle": "11-RAJENDRANAGAR",
       "ward": "60-RAJENDRANAGAR",
       "colony": "DHOBI GHAT",
@@ -1338,7 +1338,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 97,
-      "sno": "93",
+      "sno": "96",
       "circle": "11-RAJENDRANAGAR",
       "ward": "60-RAJENDRANAGAR",
       "colony": "DHOBI GHAT",
@@ -1352,7 +1352,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 98,
-      "sno": "94",
+      "sno": "97",
       "circle": "14-GOSHAMAHAL",
       "ward": "50-BEGUM BAZAR",
       "colony": "ASHOK BAZAR",
@@ -1366,7 +1366,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 99,
-      "sno": "95",
+      "sno": "98",
       "circle": "14-GOSHAMAHAL",
       "ward": "50-BEGUM BAZAR",
       "colony": "ASHOK BAZAR",
@@ -1380,7 +1380,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 100,
-      "sno": "96",
+      "sno": "99",
       "circle": "14-GOSHAMAHAL",
       "ward": "50-BEGUM BAZAR",
       "colony": "NAGAR KHANA",
@@ -1394,7 +1394,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 101,
-      "sno": "97",
+      "sno": "100",
       "circle": "14-GOSHAMAHAL",
       "ward": "50-BEGUM BAZAR",
       "colony": "NAGAR KHANA",
@@ -1408,7 +1408,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 102,
-      "sno": "98",
+      "sno": "101",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "SATYA NAGAR",
@@ -1422,7 +1422,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 103,
-      "sno": "99",
+      "sno": "102",
       "circle": "14-GOSHAMAHAL",
       "ward": "77-JAMBAGH (NAMPALLY)",
       "colony": "OSMAN GUNJ WARD 77",
@@ -1436,7 +1436,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 104,
-      "sno": "100",
+      "sno": "103",
       "circle": "14-GOSHAMAHAL",
       "ward": "77-JAMBAGH (NAMPALLY)",
       "colony": "OSMAN GUNJ WARD 77",
@@ -1450,7 +1450,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 105,
-      "sno": "101",
+      "sno": "104",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "UPPER SATYA NAGAR",
@@ -1464,7 +1464,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 106,
-      "sno": "102",
+      "sno": "105",
       "circle": "14-GOSHAMAHAL",
       "ward": "50-BEGUM BAZAR",
       "colony": "MULTHANIPURA",
@@ -1478,7 +1478,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 107,
-      "sno": "103",
+      "sno": "106",
       "circle": "24-KUKATPALLY",
       "ward": "123-HYDER NAGAR",
       "colony": "SRINIVAS COLONY",
@@ -1492,7 +1492,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 108,
-      "sno": "104",
+      "sno": "107",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "CHARY GALLI",
@@ -1506,7 +1506,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 109,
-      "sno": "105",
+      "sno": "108",
       "circle": "14-GOSHAMAHAL",
       "ward": "50-BEGUM BAZAR",
       "colony": "SANJAY NAGAR",
@@ -1520,7 +1520,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 110,
-      "sno": "106",
+      "sno": "109",
       "circle": "24-KUKATPALLY",
       "ward": "123-HYDER NAGAR",
       "colony": "TULASI NAGAR",
@@ -1534,7 +1534,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 111,
-      "sno": "107",
+      "sno": "110",
       "circle": "24-KUKATPALLY",
       "ward": "133-MACHABOLARUM",
       "colony": "BHOOPATHI RAO NAGAR",
@@ -1548,7 +1548,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 112,
-      "sno": "108",
+      "sno": "111",
       "circle": "24-KUKATPALLY",
       "ward": "133-MACHABOLARUM",
       "colony": "BHOOPATHI RAO NAGAR",
@@ -1562,7 +1562,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 113,
-      "sno": "109",
+      "sno": "112",
       "circle": "24-KUKATPALLY",
       "ward": "120-BALA NAGAR",
       "colony": "SAI NAGAR",
@@ -1576,7 +1576,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 114,
-      "sno": "110",
+      "sno": "113",
       "circle": "24-KUKATPALLY",
       "ward": "120-BALA NAGAR",
       "colony": "SAI NAGAR",
@@ -1590,7 +1590,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 115,
-      "sno": "111",
+      "sno": "114",
       "circle": "11-RAJENDRANAGAR",
       "ward": "60-RAJENDRANAGAR",
       "colony": "PRAKASH NAGAR",
@@ -1604,7 +1604,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 116,
-      "sno": "112",
+      "sno": "115",
       "circle": "11-RAJENDRANAGAR",
       "ward": "60-RAJENDRANAGAR",
       "colony": "BABU JAGJEEVAN COLONY",
@@ -1618,7 +1618,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 117,
-      "sno": "113",
+      "sno": "116",
       "circle": "11-RAJENDRANAGAR",
       "ward": "60-RAJENDRANAGAR",
       "colony": "BABU JAGJEEVAN COLONY",
@@ -1632,7 +1632,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 118,
-      "sno": "114",
+      "sno": "117",
       "circle": "29-SECUNDERABAD",
       "ward": "143-TARNAKA",
       "colony": "STRRET NO 3",
@@ -1646,7 +1646,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 119,
-      "sno": "115",
+      "sno": "118",
       "circle": "16-AMBERPET",
       "ward": "82-GOLNAKA",
       "colony": "WADERA BASTI",
@@ -1660,7 +1660,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 120,
-      "sno": "116",
+      "sno": "119",
       "circle": "24-KUKATPALLY",
       "ward": "123-HYDER NAGAR",
       "colony": "TULASI NAGAR",
@@ -1674,7 +1674,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 121,
-      "sno": "117",
+      "sno": "120",
       "circle": "24-KUKATPALLY",
       "ward": "123-HYDER NAGAR",
       "colony": "TULASI NAGAR",
@@ -1688,7 +1688,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 122,
-      "sno": "118",
+      "sno": "121",
       "circle": "21-CHANDANAGAR",
       "ward": "107-MADHAPUR",
       "colony": "KAVURI HILLS",
@@ -1702,7 +1702,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 123,
-      "sno": "119",
+      "sno": "122",
       "circle": "24-KUKATPALLY",
       "ward": "123-HYDER NAGAR",
       "colony": "JALAVYUVIHAR COLONY",
@@ -1716,7 +1716,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 124,
-      "sno": "120",
+      "sno": "123",
       "circle": "24-KUKATPALLY",
       "ward": "123-HYDER NAGAR",
       "colony": "JALAVYUVIHAR COLONY",
@@ -1730,7 +1730,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 125,
-      "sno": "121",
+      "sno": "124",
       "circle": "24-KUKATPALLY",
       "ward": "123-HYDER NAGAR",
       "colony": "JALAVYUVIHAR COLONY",
@@ -1744,7 +1744,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 126,
-      "sno": "122",
+      "sno": "125",
       "circle": "24-KUKATPALLY",
       "ward": "123-HYDER NAGAR",
       "colony": "JALAVYUVIHAR COLONY",
@@ -1758,7 +1758,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 127,
-      "sno": "123",
+      "sno": "126",
       "circle": "23-MOOSAPET",
       "ward": "115-BALAJI NAGAR",
       "colony": "HABEEB NAGAR",
@@ -1772,7 +1772,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 128,
-      "sno": "124",
+      "sno": "127",
       "circle": "24-KUKATPALLY",
       "ward": "121-KUKATPALLY",
       "colony": "BALARAM NAGAR",
@@ -1786,7 +1786,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 129,
-      "sno": "125",
+      "sno": "128",
       "circle": "24-KUKATPALLY",
       "ward": "123-HYDER NAGAR",
       "colony": "TULASI NAGAR",
@@ -1800,7 +1800,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 130,
-      "sno": "126",
+      "sno": "129",
       "circle": "24-KUKATPALLY",
       "ward": "121-KUKATPALLY",
       "colony": "BALARAM NAGAR",
@@ -1814,7 +1814,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 131,
-      "sno": "127",
+      "sno": "130",
       "circle": "13-KARWAN",
       "ward": "65-KARWAN",
       "colony": "MOGAL NAGAR A",
@@ -1828,7 +1828,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 132,
-      "sno": "128",
+      "sno": "131",
       "circle": "13-KARWAN",
       "ward": "65-KARWAN",
       "colony": "MOGAL NAGAR A",
@@ -1842,7 +1842,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 133,
-      "sno": "129",
+      "sno": "132",
       "circle": "13-KARWAN",
       "ward": "65-KARWAN",
       "colony": "MOGAL NAGAR A",
@@ -1856,7 +1856,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 134,
-      "sno": "130",
+      "sno": "133",
       "circle": "11-RAJENDRANAGAR",
       "ward": "61-ATTAPUR",
       "colony": "SUBASHNAGAR",
@@ -1870,7 +1870,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 135,
-      "sno": "131",
+      "sno": "134",
       "circle": "11-RAJENDRANAGAR",
       "ward": "61-ATTAPUR",
       "colony": "T.K.R NAGAR",
@@ -1884,7 +1884,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 136,
-      "sno": "132",
+      "sno": "135",
       "circle": "11-RAJENDRANAGAR",
       "ward": "61-ATTAPUR",
       "colony": "T.K.R NAGAR",
@@ -1898,7 +1898,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 137,
-      "sno": "133",
+      "sno": "136",
       "circle": "19-YOUSUFGUDA",
       "ward": "103-BORABANDA",
       "colony": "SRT NAGAR",
@@ -1912,7 +1912,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 138,
-      "sno": "134",
+      "sno": "137",
       "circle": "19-YOUSUFGUDA",
       "ward": "103-BORABANDA",
       "colony": "SRT NAGAR",
@@ -1926,7 +1926,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 139,
-      "sno": "135",
+      "sno": "138",
       "circle": "13-KARWAN",
       "ward": "65-KARWAN",
       "colony": "GARIKAPALLY",
@@ -1940,7 +1940,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 140,
-      "sno": "136",
+      "sno": "139",
       "circle": "13-KARWAN",
       "ward": "65-KARWAN",
       "colony": "GARIKAPALLY",
@@ -1954,7 +1954,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 141,
-      "sno": "137",
+      "sno": "140",
       "circle": "24-KUKATPALLY",
       "ward": "122-VIVEKANANDA NAGAR COLONY",
       "colony": "VENKATESWARA NAGAR",
@@ -1968,7 +1968,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 142,
-      "sno": "138",
+      "sno": "141",
       "circle": "24-KUKATPALLY",
       "ward": "122-VIVEKANANDA NAGAR COLONY",
       "colony": "VENKATESWARA NAGAR",
@@ -1982,7 +1982,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 143,
-      "sno": "139",
+      "sno": "142",
       "circle": "24-KUKATPALLY",
       "ward": "122-VIVEKANANDA NAGAR COLONY",
       "colony": "VENKATESWARA NAGAR",
@@ -1996,7 +1996,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 144,
-      "sno": "140",
+      "sno": "143",
       "circle": "24-KUKATPALLY",
       "ward": "122-VIVEKANANDA NAGAR COLONY",
       "colony": "VENKATESWARA NAGAR",
@@ -2010,7 +2010,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 145,
-      "sno": "141",
+      "sno": "144",
       "circle": "3-HAYATNAGAR",
       "ward": "13-HAYATHNAGAR",
       "colony": "OTHERS (GHMC) 005",
@@ -2024,7 +2024,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 146,
-      "sno": "142",
+      "sno": "145",
       "circle": "4-LBNAGAR",
       "ward": "15-VANASTHALIPURAM",
       "colony": "YASHODHA NAGAR PHASE II",
@@ -2038,7 +2038,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 147,
-      "sno": "143",
+      "sno": "146",
       "circle": "19-YOUSUFGUDA",
       "ward": "101-ERRAGADDA",
       "colony": "ERRAGADDA MAIN ROAD",
@@ -2052,7 +2052,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 148,
-      "sno": "144",
+      "sno": "147",
       "circle": "19-YOUSUFGUDA",
       "ward": "101-ERRAGADDA",
       "colony": "ERRAGADDA MAIN ROAD",
@@ -2066,7 +2066,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 149,
-      "sno": "145",
+      "sno": "148",
       "circle": "19-YOUSUFGUDA",
       "ward": "101-ERRAGADDA",
       "colony": "ERRAGADDA MAIN ROAD",
@@ -2080,7 +2080,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 150,
-      "sno": "146",
+      "sno": "149",
       "circle": "13-KARWAN",
       "ward": "62-ZIAGUDA",
       "colony": "BHARAT NAGAR",
@@ -2094,7 +2094,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 151,
-      "sno": "147",
+      "sno": "150",
       "circle": "13-KARWAN",
       "ward": "62-ZIAGUDA",
       "colony": "LAXMI NARSHIMHA NAGAR",
@@ -2108,7 +2108,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 152,
-      "sno": "148",
+      "sno": "151",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "PRASHANTH NAGAR COLONY",
@@ -2122,7 +2122,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 153,
-      "sno": "149",
+      "sno": "152",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "BALAGANGADAR THILAK NAGAR",
@@ -2136,7 +2136,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 154,
-      "sno": "150",
+      "sno": "153",
       "circle": "16-AMBERPET",
       "ward": "81-NALLAKUNTA",
       "colony": "MOTHER DAIRY LINAGALA COLONY",
@@ -2150,7 +2150,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 155,
-      "sno": "151",
+      "sno": "154",
       "circle": "19-YOUSUFGUDA",
       "ward": "101-ERRAGADDA",
       "colony": "ERRAGADDA MAIN ROAD",
@@ -2164,7 +2164,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 156,
-      "sno": "152",
+      "sno": "155",
       "circle": "26-GAJULARAMARAM",
       "ward": "126-JAGADGIRI GUTTA",
       "colony": "SHIRDI HILLS",
@@ -2178,7 +2178,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 157,
-      "sno": "153",
+      "sno": "156",
       "circle": "26-GAJULARAMARAM",
       "ward": "126-JAGADGIRI GUTTA",
       "colony": "POLALA BASTHI",
@@ -2192,7 +2192,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 158,
-      "sno": "154",
+      "sno": "157",
       "circle": "26-GAJULARAMARAM",
       "ward": "126-JAGADGIRI GUTTA",
       "colony": "LENIN NAGAR",
@@ -2206,7 +2206,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 159,
-      "sno": "155",
+      "sno": "158",
       "circle": "26-GAJULARAMARAM",
       "ward": "126-JAGADGIRI GUTTA",
       "colony": "NTR NAGAR A",
@@ -2220,7 +2220,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 160,
-      "sno": "156",
+      "sno": "159",
       "circle": "29-SECUNDERABAD",
       "ward": "145-SEETHAPHALMANDI",
       "colony": "INDRA NAGAR ST 1-8",
@@ -2234,7 +2234,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 161,
-      "sno": "157",
+      "sno": "160",
       "circle": "1-KAPRA",
       "ward": "3-CHERLAPALLY WARD",
       "colony": "LAXMI NARASIMHA COLONY PHASE 1",
@@ -2248,7 +2248,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 162,
-      "sno": "158",
+      "sno": "161",
       "circle": "1-KAPRA",
       "ward": "3-CHERLAPALLY WARD",
       "colony": "LAXMI NARASIMHA COLONY PHASE 2",
@@ -2262,7 +2262,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 163,
-      "sno": "159",
+      "sno": "162",
       "circle": "1-KAPRA",
       "ward": "3-CHERLAPALLY WARD",
       "colony": "MAHALXMI NAGAR",
@@ -2276,7 +2276,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 164,
-      "sno": "160",
+      "sno": "163",
       "circle": "6-MALAKPET",
       "ward": "27-AKBERBAGH",
       "colony": "AKBARBAGH",
@@ -2290,7 +2290,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 165,
-      "sno": "161",
+      "sno": "164",
       "circle": "6-MALAKPET",
       "ward": "27-AKBERBAGH",
       "colony": "AKBARBAGH",
@@ -2304,7 +2304,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 166,
-      "sno": "162",
+      "sno": "165",
       "circle": "21-CHANDANAGAR",
       "ward": "110-CHANDANAGAR",
       "colony": "REDDY COLONY",
@@ -2318,7 +2318,7 @@ window.GHMC_INITIAL_DATA = {
     },
     {
       "row": 167,
-      "sno": "163",
+      "sno": "166",
       "circle": "21-CHANDANAGAR",
       "ward": "107-MADHAPUR",
       "colony": "SREE BAGH COLONY",

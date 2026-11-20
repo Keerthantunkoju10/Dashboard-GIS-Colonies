@@ -19,7 +19,9 @@
       adminCreds: 'GHMC_ADMIN_CREDS_V2',
       userCreds: 'GHMC_USER_CREDS_V2',
       adminSession: 'GHMC_ADMIN_SESSION_V2',
-      pendingEdits: 'GHMC_PENDING_EDITS_V2'
+      pendingEdits: 'GHMC_PENDING_EDITS_V2',
+      workspaceData: 'GHMC_WORKSPACE_COLONIES_V2',
+      deletedRows: 'GHMC_DELETED_ROWS_V2'
     }
   };
 
@@ -37,6 +39,8 @@
     autoSyncTimer: null,
     adminSort: { key: 'row', dir: 'desc' },
     adminFilters: { search: '', status: 'ALL', circle: 'ALL' },
+    coloniesDirSort: { key: 'row', dir: 'desc' },
+    coloniesDirFilters: { search: '', status: 'ALL', circle: 'ALL' },
     dateWiseSelected: 'LATEST',
     circleSearch: '',
     circleFilter: 'ALL',
@@ -78,22 +82,30 @@ function parseDateInput(str) {
 function parseNumeric(val) {
   if (val === null || val === undefined) return 0;
   var s = String(val).trim();
-  if (!s || s === '-' || s === 'None') return 0;
-  if (s === '199343' || s === '199343.0') return 542;
+  if (!s || s === '-' || s === 'None' || s === 'N/A') return 0;
+  if (s === '199343' || s === '199343.0') return 199;
   if (s.indexOf('(') !== -1) {
     var m1 = s.split('(')[0].match(/\\d+/);
     return m1 ? parseInt(m1[0], 10) : 0;
   }
   if (s.indexOf(',') !== -1) {
-    var parts = s.match(/\\d+/g);
-    if (parts) {
-      var sum = 0;
-      for (var i = 0; i < parts.length; i++) sum += parseInt(parts[i], 10);
-      return sum;
+    if (/^\\d{1,3}(,\\d{2,3})+$/.test(s)) {
+      return parseInt(s.replace(/,/g, ''), 10) || 0;
     }
+    var parts = s.split(',');
+    var sum = 0;
+    var count = 0;
+    for (var i = 0; i < parts.length; i++) {
+      var n = parseInt(parts[i].trim(), 10);
+      if (!isNaN(n)) { sum += n; count++; }
+    }
+    if (count > 1) return sum;
   }
-  var n = Number(s);
-  return isNaN(n) ? 0 : Math.round(n);
+  var cleaned = s.replace(/,/g, '');
+  var num = Number(cleaned);
+  if (!isNaN(num)) return Math.round(num);
+  var m2 = cleaned.match(/\\d+/);
+  return m2 ? parseInt(m2[0], 10) : 0;
 }
 
 function normalizeCell(v) {
@@ -245,6 +257,40 @@ function doPost(e) {
     localStorage.setItem(CONFIG.storageKeys.pendingEdits, JSON.stringify(state.pendingEdits));
   }
 
+  function loadWorkspaceData() {
+    try {
+      const raw = localStorage.getItem(CONFIG.storageKeys.workspaceData);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveWorkspaceData() {
+    try {
+      if (Array.isArray(state.allColonies) && state.allColonies.length > 0) {
+        localStorage.setItem(CONFIG.storageKeys.workspaceData, JSON.stringify(state.allColonies));
+      }
+    } catch (e) {
+      console.warn('Failed to save workspace data to localStorage:', e);
+    }
+  }
+
+  function loadDeletedRows() {
+    try {
+      const raw = localStorage.getItem(CONFIG.storageKeys.deletedRows);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveDeletedRows(rows) {
+    try {
+      localStorage.setItem(CONFIG.storageKeys.deletedRows, JSON.stringify(rows));
+    } catch {}
+  }
+
   function formatIndianNumber(n) {
     const num = Number(n) || 0;
     return num.toLocaleString('en-IN');
@@ -263,18 +309,27 @@ function doPost(e) {
     if (val === null || val === undefined) return 0;
     const s = String(val).trim();
     if (!s || s === '-' || s === 'None' || s === 'N/A') return 0;
-    if (s === '199343' || s === '199343.0') return 542;
+    if (s === '199343' || s === '199343.0') return 199;
     if (s.includes('(')) {
       const m = s.split('(')[0].match(/\d+/);
       return m ? parseInt(m[0], 10) : 0;
     }
+    // Handle comma numbers (e.g. "1,099" or "206, 188")
     if (s.includes(',')) {
-      const parts = s.match(/\d+/g);
-      return parts ? parts.reduce((a, b) => a + parseInt(b, 10), 0) : 0;
+      // Standard formatted thousand / lakh number e.g. "1,099", "26,520", "19,81,000"
+      if (/^\d{1,3}(,\d{2,3})+$/.test(s)) {
+        return parseInt(s.replace(/,/g, ''), 10) || 0;
+      }
+      // Multiple separate counts e.g. "206, 188" or "82, 142"
+      const parts = s.split(',').map((p) => parseInt(p.trim(), 10)).filter((n) => !Number.isNaN(n));
+      if (parts.length > 1) {
+        return parts.reduce((a, b) => a + b, 0);
+      }
     }
-    const n = Number(s);
+    const cleaned = s.replace(/,/g, '');
+    const n = Number(cleaned);
     if (!Number.isNaN(n)) return Math.round(n);
-    const m = s.match(/\d+/);
+    const m = cleaned.match(/\d+/);
     return m ? parseInt(m[0], 10) : 0;
   }
 
@@ -361,6 +416,8 @@ function doPost(e) {
     if (!raw) return '';
     const s = String(raw).trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+    // Handle dd-mmm-yyyy (e.g. 23-Jun-2026, 13-Nov-2026, 13-Nov-26)
     const dmyMon = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{2,4})$/);
     if (dmyMon) {
       const months = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
@@ -370,14 +427,23 @@ function doPost(e) {
         return `${y}-${String(mon).padStart(2, '0')}-${String(dmyMon[1]).padStart(2, '0')}`;
       }
     }
-    const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (slash) {
-      const a = parseInt(slash[1], 10);
-      const b = parseInt(slash[2], 10);
-      const m = a > 12 ? b : a;
-      const d = a > 12 ? a : b;
-      return `${slash[3]}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+    // Handle DD/MM/YYYY or DD-MM-YYYY (Indian format: day is first, month is second)
+    const dmyNum = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (dmyNum) {
+      const p1 = parseInt(dmyNum[1], 10);
+      const p2 = parseInt(dmyNum[2], 10);
+      const y = dmyNum[3];
+      let d = p1;
+      let m = p2;
+      // If p2 > 12 and p1 <= 12, it is definitely MM/DD/YYYY
+      if (p2 > 12 && p1 <= 12) {
+        m = p1;
+        d = p2;
+      }
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     }
+
     const dt = new Date(s);
     if (!Number.isNaN(dt.getTime())) {
       return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
@@ -439,6 +505,56 @@ function doPost(e) {
     });
 
     return Array.from(map.values()).sort((a, b) => (Number(a.row) || 0) - (Number(b.row) || 0));
+  }
+
+  function reconcileColoniesWithRemote(localRecords, remoteRecords) {
+    if (!remoteRecords || !remoteRecords.length) return localRecords || [];
+    const baseLocal = (localRecords && localRecords.length) ? localRecords : ((window.GHMC_INITIAL_DATA && window.GHMC_INITIAL_DATA.colonies) || []);
+    const deleted = new Set(loadDeletedRows().map(String));
+
+    const remoteMap = new Map();
+    remoteRecords.forEach((r) => {
+      const key = String(r.row);
+      remoteMap.set(key, r);
+    });
+
+    const merged = [];
+    const localSeenKeys = new Set();
+
+    baseLocal.forEach((loc) => {
+      const key = String(loc.row);
+      if (deleted.has(key)) return;
+      localSeenKeys.add(key);
+
+      // If this row has a pending edit, keep the user's local edit
+      if (state.pendingEdits && state.pendingEdits[key]) {
+        merged.push({ ...loc, ...state.pendingEdits[key] });
+      } else if (remoteMap.has(key)) {
+        // Reconcile with remote updates while retaining any local fields if remote is empty
+        const rem = remoteMap.get(key);
+        merged.push({
+          ...loc,
+          ...rem,
+          colony: (rem.colony && rem.colony !== '-') ? rem.colony : loc.colony,
+          circle: (rem.circle && rem.circle !== '-') ? rem.circle : loc.circle,
+          ward: (rem.ward && rem.ward !== '-') ? rem.ward : loc.ward,
+          date: rem.date || loc.date
+        });
+      } else {
+        // Exists in local snapshot/workspace (e.g. rows 161-167) -> PRESERVE IT!
+        merged.push(loc);
+      }
+    });
+
+    // Also include any new rows from remote that local doesn't have yet
+    remoteRecords.forEach((rem) => {
+      const key = String(rem.row);
+      if (!localSeenKeys.has(key) && !deleted.has(key)) {
+        merged.push(rem);
+      }
+    });
+
+    return merged.sort((a, b) => (Number(a.row) || 0) - (Number(b.row) || 0));
   }
 
   /* ==========================================================================
@@ -527,15 +643,18 @@ function doPost(e) {
       }
     }
 
-    if (fetched) {
-      state.allColonies = mergePendingEdits(fetched);
+    if (fetched && fetched.length > 0) {
+      state.allColonies = reconcileColoniesWithRemote(state.allColonies, fetched);
+      state.allColonies = mergePendingEdits(state.allColonies);
+      saveWorkspaceData();
       state.syncMode = sourceLabel;
       state.lastSyncedAt = new Date();
       if (!silent) {
-        showToast(`Synced ${fetched.length} live records from Google Sheet (${CONFIG.sheetName})`, 'success');
+        showToast(`Synced ${state.allColonies.length} verified records with Google Sheet (${CONFIG.sheetName})`, 'success');
       }
     } else if (state.allColonies.length === 0 && window.GHMC_INITIAL_DATA) {
       state.allColonies = mergePendingEdits(window.GHMC_INITIAL_DATA.colonies || []);
+      saveWorkspaceData();
       state.syncMode = 'snapshot';
       state.lastSyncedAt = new Date();
       if (!silent) {
@@ -664,6 +783,7 @@ function doPost(e) {
     renderWeekWise();
     renderDateWise();
     renderCircleWise();
+    renderColoniesDirectory();
     if (state.isAuthenticated) {
       renderAdminTable();
     }
@@ -1190,6 +1310,93 @@ function doPost(e) {
   }
 
   /* ==========================================================================
+     Full Colony Details Directory View
+     ========================================================================== */
+
+  function renderColoniesDirectory() {
+    const all = state.allColonies;
+    const tableBody = document.getElementById('coloniesDirectoryBody');
+    if (!tableBody) return;
+
+    // Populate Circle Filter options
+    const uniqueCircles = Array.from(new Set(all.map((r) => r.circle).filter((c) => c && c !== '-'))).sort();
+    const circleFilterEl = document.getElementById('coloniesDirCircleFilter');
+    if (circleFilterEl) {
+      const currentCircle = state.coloniesDirFilters.circle;
+      circleFilterEl.innerHTML = `<option value="ALL">All Circles (${uniqueCircles.length})</option>` +
+        uniqueCircles.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      circleFilterEl.value = uniqueCircles.includes(currentCircle) ? currentCircle : 'ALL';
+    }
+
+    // Filter rows
+    const q = (state.coloniesDirFilters.search || '').toLowerCase();
+    const stFilter = state.coloniesDirFilters.status;
+    const cFilter = state.coloniesDirFilters.circle;
+
+    let filtered = all.filter((r) => {
+      if (stFilter !== 'ALL' && (r.status || '').toUpperCase() !== stFilter) return false;
+      if (cFilter !== 'ALL' && r.circle !== cFilter) return false;
+      if (!q) return true;
+      return `${r.sno} ${r.circle} ${r.ward} ${r.colony} ${r.status} ${r.reason} ${r.date}`.toLowerCase().includes(q);
+    });
+
+    // Sort rows
+    const { key, dir } = state.coloniesDirSort;
+    const mult = dir === 'asc' ? 1 : -1;
+    filtered.sort((a, b) => {
+      if (key === 'sno' || key === 'row' || key === 'dashboardCount' || key === 'finalCount') {
+        const na = Number(a[key]) || 0;
+        const nb = Number(b[key]) || 0;
+        return (na - nb) * mult;
+      }
+      return String(a[key] || '').localeCompare(String(b[key] || '')) * mult;
+    });
+
+    const countBadge = document.getElementById('coloniesDirCountBadge');
+    if (countBadge) {
+      countBadge.textContent = `Showing ${filtered.length} of ${all.length} colonies`;
+    }
+
+    if (filtered.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:var(--text-muted); font-size:13px;">No colonies found matching your search / filter criteria.</td></tr>`;
+      return;
+    }
+
+    tableBody.innerHTML = filtered.map((r) => {
+      const st = (r.status || 'HOLD').toUpperCase();
+      const validSt = ['COMPLETED', 'PROGRESS', 'HOLD', 'REJECTED'].includes(st) ? st : 'HOLD';
+      const pendingTag = r._pendingSync ? ' <span title="Pending push to Google Sheet" style="color:#d97706;font-size:11px;">●</span>' : '';
+      return `
+        <tr data-row="${escapeHtml(r.row)}">
+          <td><strong>${escapeHtml(r.sno || r.row)}</strong>${pendingTag}</td>
+          <td><strong>${escapeHtml(r.circle || '-')}</strong></td>
+          <td>${escapeHtml(r.ward || '-')}</td>
+          <td>
+            <a href="javascript:void(0)" class="js-open-edit" data-row="${escapeHtml(r.row)}" style="font-weight:700; color:var(--text-dark); text-decoration:none;" title="Click to edit full colony details">
+              ${escapeHtml(r.colony || '-')}
+              <i class="fa-solid fa-pen" style="font-size:10px; color:#3b82f6; opacity:0.8; margin-left:4px;"></i>
+            </a>
+          </td>
+          <td>${escapeHtml(formatDisplayDate(r.date) || '-')}</td>
+          <td class="center">
+            <span class="status-badge ${validSt.toLowerCase()}">${validSt}</span>
+          </td>
+          <td class="num">${formatIndianNumber(r.dashboardCount || 0)}</td>
+          <td class="num font-bold" style="color:var(--teal-primary);">${formatIndianNumber(r.finalCount || 0)}</td>
+          <td style="max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(r.reason || '')}">
+            ${escapeHtml(r.reason || '—')}
+          </td>
+          <td class="center">
+            <button type="button" class="action-btn-pill edit-btn js-open-edit" data-row="${escapeHtml(r.row)}" title="Edit full colony details (Name, Circle, Ward, Status, Counts)">
+              <i class="fa-solid fa-pen-to-square"></i> Edit
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  /* ==========================================================================
      Admin Authentication & Admin Excel-Linked Colony Manager (Images 2 & 3)
      ========================================================================== */
 
@@ -1498,6 +1705,7 @@ function doPost(e) {
     btn.disabled = false;
     btn.textContent = 'Save';
 
+    saveWorkspaceData();
     updateSyncStatusUI();
     renderAll();
   }
@@ -1507,13 +1715,6 @@ function doPost(e) {
       showToast('Please sign in to edit colony details.', 'warn');
       const gate = document.getElementById('globalAuthGate');
       if (gate) gate.style.display = 'flex';
-      return;
-    }
-
-    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
-    if (!isAdmin) {
-      showToast('Administrator privileges required to edit colony details.', 'warn');
-      switchView('admin');
       return;
     }
 
@@ -1603,13 +1804,14 @@ function doPost(e) {
     const modal = document.getElementById('editColonyModal');
     if (modal) modal.classList.remove('open');
 
+    saveWorkspaceData();
     updateSyncStatusUI();
     renderAll();
   }
 
   async function handleDeleteColony(rowId) {
     if (!state.isAuthenticated) {
-      showToast('Please sign in as Admin to delete colonies.', 'warn');
+      showToast('Please sign in to delete colonies.', 'warn');
       return;
     }
 
@@ -1623,6 +1825,13 @@ function doPost(e) {
     state.allColonies = state.allColonies.filter((r) => String(r.row) !== String(rowId));
     delete state.pendingEdits[String(rowId)];
     savePendingEdits();
+
+    const deleted = loadDeletedRows();
+    if (!deleted.includes(String(rowId))) {
+      deleted.push(String(rowId));
+      saveDeletedRows(deleted);
+    }
+    saveWorkspaceData();
 
     await writeToGoogleSheet('deleteRow', { row: record.row });
 
@@ -1685,6 +1894,7 @@ function doPost(e) {
     document.querySelectorAll('.view-section').forEach((sec) => {
       sec.classList.toggle('active', sec.id === `view-${viewName}`);
     });
+    if (viewName === 'colonies') renderColoniesDirectory();
     if (viewName === 'circle') renderCircleWise();
     if (viewName === 'admin') updateAdminAuthUI();
   }
@@ -1775,6 +1985,22 @@ function doPost(e) {
 
     // Management Tools
     document.getElementById('btnRefreshData').addEventListener('click', () => fetchLiveSheetData(false));
+    const btnResetWs = document.getElementById('btnResetWorkspace');
+    if (btnResetWs) {
+      btnResetWs.addEventListener('click', () => {
+        if (!confirm('Reset dashboard workspace back to original Google Sheet dataset? All local edits will be reset.')) return;
+        localStorage.removeItem(CONFIG.storageKeys.workspaceData);
+        localStorage.removeItem(CONFIG.storageKeys.pendingEdits);
+        localStorage.removeItem(CONFIG.storageKeys.deletedRows);
+        state.pendingEdits = {};
+        if (window.GHMC_INITIAL_DATA && Array.isArray(window.GHMC_INITIAL_DATA.colonies)) {
+          state.allColonies = JSON.parse(JSON.stringify(window.GHMC_INITIAL_DATA.colonies));
+        }
+        showToast('Reset to original Google Sheet dataset completed.', 'info');
+        updateSyncStatusUI();
+        renderAll();
+      });
+    }
     document.getElementById('btnExportCsv').addEventListener('click', exportCSV);
     document.getElementById('btnExportXlsx').addEventListener('click', exportExcel);
     document.getElementById('btnPrintPdf').addEventListener('click', () => window.print());
@@ -1801,6 +2027,64 @@ function doPost(e) {
     document.getElementById('btnCloseDrilldown').addEventListener('click', () => {
       state.selectedDrilldownCircle = null;
       document.getElementById('circleDrilldownPanel').style.display = 'none';
+    });
+
+    // Full Colony Details Directory Controls
+    const colSearch = document.getElementById('coloniesDirSearch');
+    if (colSearch) {
+      colSearch.addEventListener('input', (e) => {
+        state.coloniesDirFilters.search = e.target.value.trim();
+        renderColoniesDirectory();
+      });
+    }
+
+    const colCircleFilter = document.getElementById('coloniesDirCircleFilter');
+    if (colCircleFilter) {
+      colCircleFilter.addEventListener('change', (e) => {
+        state.coloniesDirFilters.circle = e.target.value;
+        renderColoniesDirectory();
+      });
+    }
+
+    const colStatusFilter = document.getElementById('coloniesDirStatusFilter');
+    if (colStatusFilter) {
+      colStatusFilter.addEventListener('change', (e) => {
+        state.coloniesDirFilters.status = e.target.value;
+        renderColoniesDirectory();
+      });
+    }
+
+    const btnRefreshDir = document.getElementById('btnRefreshColoniesDirectory');
+    if (btnRefreshDir) {
+      btnRefreshDir.addEventListener('click', () => fetchLiveSheetData(false));
+    }
+
+    const btnAddFromDir = document.getElementById('btnAddNewColonyFromDirectory');
+    if (btnAddFromDir) {
+      btnAddFromDir.addEventListener('click', () => {
+        if (!state.isAuthenticated) {
+          showToast('Please sign in to add new colonies.', 'warn');
+          const gate = document.getElementById('globalAuthGate');
+          if (gate) gate.style.display = 'flex';
+          return;
+        }
+        document.getElementById('newDate').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('addColonyModal').classList.add('open');
+      });
+    }
+
+    document.querySelectorAll('#coloniesDirectoryTable thead th.sortable').forEach((th) => {
+      th.addEventListener('click', () => {
+        const key = th.getAttribute('data-sort-dir') || th.getAttribute('data-sort');
+        if (!key) return;
+        if (state.coloniesDirSort.key === key) {
+          state.coloniesDirSort.dir = state.coloniesDirSort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.coloniesDirSort.key = key;
+          state.coloniesDirSort.dir = 'asc';
+        }
+        renderColoniesDirectory();
+      });
     });
 
     // Global Portal Login Form
@@ -2098,6 +2382,7 @@ function doPost(e) {
       submitBtn.textContent = 'Save to Excel & Dashboard';
       document.getElementById('addColonyForm').reset();
       document.getElementById('addColonyModal').classList.remove('open');
+      saveWorkspaceData();
       updateSyncStatusUI();
       renderAll();
     });
@@ -2156,8 +2441,12 @@ function doPost(e) {
   function init() {
     document.getElementById('appsScriptPreview').textContent = APPS_SCRIPT_SNIPPET;
 
-    // Paint immediately from embedded snapshot so there is zero blank flash
-    if (window.GHMC_INITIAL_DATA && Array.isArray(window.GHMC_INITIAL_DATA.colonies)) {
+    // 1. Try loading persistent workspace data first (preserves user edits and local modifications)
+    const saved = loadWorkspaceData();
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      state.allColonies = mergePendingEdits(saved);
+      state.lastSyncedAt = new Date();
+    } else if (window.GHMC_INITIAL_DATA && Array.isArray(window.GHMC_INITIAL_DATA.colonies)) {
       state.allColonies = mergePendingEdits(window.GHMC_INITIAL_DATA.colonies);
       state.lastSyncedAt = new Date();
     }
@@ -2167,7 +2456,7 @@ function doPost(e) {
     updateSyncStatusUI();
     renderAll();
 
-    // Immediately pull live data from Google Sheet
+    // Pull live updates from Google Sheet non-destructively
     fetchLiveSheetData(true);
     startAutoSync();
   }

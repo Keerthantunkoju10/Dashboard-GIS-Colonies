@@ -207,6 +207,14 @@
         </span>
       </button>
 
+      <button class="view-tab-btn" data-view="colonies" id="coloniesViewTabBtn">
+        <span class="view-tab-icon"><i class="fa-solid fa-house-laptop"></i></span>
+        <span class="view-tab-text">
+          <span class="view-tab-title">Full Colony Details</span>
+          <span class="view-tab-sub">All colonies directory &amp; edit</span>
+        </span>
+      </button>
+
       <button class="view-tab-btn" data-view="month">
         <span class="view-tab-icon"><i class="fa-regular fa-calendar"></i></span>
         <span class="view-tab-text">
@@ -283,6 +291,10 @@
         <button class="tool-btn" id="btnRefreshData">
           <i class="fa-solid fa-arrows-rotate" id="refreshIcon"></i>
           <span>Refresh Data</span>
+        </button>
+        <button class="tool-btn" id="btnResetWorkspace" title="Reset workspace to default dataset">
+          <i class="fa-solid fa-rotate-left"></i>
+          <span>Reset Default</span>
         </button>
         <button class="tool-btn" id="btnExportCsv">
           <i class="fa-solid fa-file-csv"></i>
@@ -428,6 +440,71 @@
         </div>
       </section>
     </main>
+
+    <!-- ====================================================================
+         VIEW: FULL COLONY DETAILS (All Colonies Directory & Edit Management)
+         ==================================================================== -->
+    <section id="view-colonies" class="view-section">
+      <div class="panel-card">
+        <div class="panel-header" style="flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3><i class="fa-solid fa-house-laptop" style="color: #2563eb; margin-right: 6px;"></i> Full Colony Details &amp; Performance Directory</h3>
+            <p style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+              Live Google Sheets (COLONIES) &bull; Search, filter, and edit full details for any colony record
+            </p>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="tool-btn teal" id="btnAddNewColonyFromDirectory">
+              <i class="fa-solid fa-plus-circle"></i> Add New Colony
+            </button>
+            <button class="tool-btn" id="btnRefreshColoniesDirectory">
+              <i class="fa-solid fa-arrows-rotate"></i> Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Controls -->
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 12px 14px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <input type="text" id="coloniesDirSearch" class="control-input" placeholder="Search colony, ward, circle, or remarks..." style="width: 280px; padding: 7px 12px;" />
+            <select id="coloniesDirCircleFilter" class="control-select" style="width: auto; padding: 7px 12px;">
+              <option value="ALL">All Circles</option>
+            </select>
+            <select id="coloniesDirStatusFilter" class="control-select" style="width: auto; padding: 7px 12px;">
+              <option value="ALL">All Statuses</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="PROGRESS">In Progress</option>
+              <option value="HOLD">Hold</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+          </div>
+          <div style="font-size: 12px; font-weight: 600; color: var(--text-muted);" id="coloniesDirCountBadge">
+            Showing 0 colonies
+          </div>
+        </div>
+
+        <!-- Directory Table -->
+        <div class="table-scroll">
+          <table class="data-table" id="coloniesDirectoryTable">
+            <thead>
+              <tr>
+                <th class="sortable" data-sort-dir="sno">SNO &#8597;</th>
+                <th class="sortable" data-sort-dir="circle">Circle &#8597;</th>
+                <th class="sortable" data-sort-dir="ward">Ward &#8597;</th>
+                <th class="sortable" data-sort-dir="colony">Colony Name &#8597;</th>
+                <th class="sortable" data-sort-dir="date">Allotted Date &#8597;</th>
+                <th class="sortable center" data-sort-dir="status">Status &#8597;</th>
+                <th class="sortable num" data-sort-dir="dashboardCount">Dashboard Count &#8597;</th>
+                <th class="sortable num" data-sort-dir="finalCount">Finalized Count &#8597;</th>
+                <th>Reason / Remarks</th>
+                <th class="center" style="min-width: 110px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="coloniesDirectoryBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
     <!-- ====================================================================
          VIEW 2: MONTH WISE

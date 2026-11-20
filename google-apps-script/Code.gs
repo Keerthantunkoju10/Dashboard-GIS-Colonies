@@ -55,22 +55,28 @@ function parseNumeric(val) {
   if (val === null || val === undefined) return 0;
   var s = String(val).trim();
   if (s === '' || s === '-' || s === 'None' || s === 'N/A') return 0;
-  if (s === '199343' || s === '199343.0') return 542;
+  if (s === '199343' || s === '199343.0') return 199;
   if (s.indexOf('(') !== -1) {
     var m1 = s.split('(')[0].match(/\d+/);
     return m1 ? parseInt(m1[0], 10) : 0;
   }
   if (s.indexOf(',') !== -1) {
-    var parts = s.match(/\d+/g);
-    if (parts) {
-      var sum = 0;
-      for (var i = 0; i < parts.length; i++) sum += parseInt(parts[i], 10);
-      return sum;
+    if (/^\d{1,3}(,\d{2,3})+$/.test(s)) {
+      return parseInt(s.replace(/,/g, ''), 10) || 0;
     }
+    var parts = s.split(',');
+    var sum = 0;
+    var count = 0;
+    for (var i = 0; i < parts.length; i++) {
+      var n = parseInt(parts[i].trim(), 10);
+      if (!isNaN(n)) { sum += n; count++; }
+    }
+    if (count > 1) return sum;
   }
-  var n = Number(s);
-  if (!isNaN(n)) return Math.round(n);
-  var m2 = s.match(/\d+/);
+  var cleaned = s.replace(/,/g, '');
+  var num = Number(cleaned);
+  if (!isNaN(num)) return Math.round(num);
+  var m2 = cleaned.match(/\d+/);
   return m2 ? parseInt(m2[0], 10) : 0;
 }
 

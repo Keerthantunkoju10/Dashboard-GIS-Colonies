@@ -71,16 +71,22 @@ function parseNumeric(val) {
   if (val === null || val === undefined) return 0;
   const s = String(val).trim();
   if (!s || s === '-' || s === 'None' || s === 'N/A') return 0;
-  if (s === '199343' || s === '199343.0') return 542;
+  if (s === '199343' || s === '199343.0') return 199;
   if (s.includes('(')) {
     const m = s.split('(')[0].match(/\d+/);
     return m ? parseInt(m[0], 10) : 0;
   }
   if (s.includes(',')) {
-    const nums = s.match(/\d+/g);
-    return nums ? nums.reduce((acc, n) => acc + parseInt(n, 10), 0) : 0;
+    if (/^\d{1,3}(,\d{2,3})+$/.test(s)) {
+      return parseInt(s.replace(/,/g, ''), 10) || 0;
+    }
+    const parts = s.split(',').map((p) => parseInt(p.trim(), 10)).filter((n) => !Number.isNaN(n));
+    if (parts.length > 1) {
+      return parts.reduce((acc, n) => acc + n, 0);
+    }
   }
-  const n = Number(s);
+  const cleaned = s.replace(/,/g, '');
+  const n = Number(cleaned);
   if (!Number.isNaN(n)) return Math.round(n);
   const m = s.match(/\d+/);
   return m ? parseInt(m[0], 10) : 0;
@@ -91,7 +97,7 @@ function normalizeDate(raw) {
   const s = String(raw).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
 
-  // Handle dd-mmm-yyyy or dd/mm/yyyy or mm/dd/yyyy from GViz CSV
+  // Handle dd-mmm-yyyy (e.g. 23-Jun-2026, 13-Nov-2026, 13-Nov-26)
   const dmyMon = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{2,4})$/);
   if (dmyMon) {
     const months = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
@@ -102,14 +108,18 @@ function normalizeDate(raw) {
     }
   }
 
-  const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (slash) {
-    const a = parseInt(slash[1], 10);
-    const b = parseInt(slash[2], 10);
-    const y = slash[3];
-    // Google Sheets GViz US locale outputs M/D/YYYY
-    const m = a > 12 ? b : a;
-    const d = a > 12 ? a : b;
+  // Handle DD/MM/YYYY or DD-MM-YYYY (Indian format: day is first, month is second)
+  const dmyNum = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmyNum) {
+    const p1 = parseInt(dmyNum[1], 10);
+    const p2 = parseInt(dmyNum[2], 10);
+    const y = dmyNum[3];
+    let d = p1;
+    let m = p2;
+    if (p2 > 12 && p1 <= 12) {
+      m = p1;
+      d = p2;
+    }
     return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   }
 
