@@ -35,8 +35,8 @@ exports.handler = async function (event) {
     const inputUser = (body.username || '').trim().toLowerCase();
     const inputPass = body.password || '';
 
-    const envAdminUser = (process.env.ADMIN_USERNAME || 'admin').trim().toLowerCase();
-    const envAdminPass = process.env.ADMIN_PASSWORD || 'admin123';
+    const envAdminUser = (process.env.ADMIN_USERNAME || 'Keerthan Tunkoju').trim().toLowerCase();
+    const envAdminPass = process.env.ADMIN_PASSWORD || '2001';
 
     const envUserUser = (process.env.USER_USERNAME || 'user').trim().toLowerCase();
     const envUserPass = process.env.USER_PASSWORD || 'user123';
@@ -50,7 +50,7 @@ exports.handler = async function (event) {
           ok: true,
           authenticated: true,
           user: {
-            username: process.env.ADMIN_USERNAME || 'Admin',
+            username: process.env.ADMIN_USERNAME || 'Keerthan Tunkoju',
             role: 'admin',
             authMethod: 'netlify-env'
           }

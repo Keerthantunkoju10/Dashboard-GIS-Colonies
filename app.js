@@ -12,6 +12,7 @@
     sheetId: '1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE',
     sheetName: 'COLONIES',
     sheetUrl: 'https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit?usp=sharing',
+    defaultScriptUrl: 'https://script.google.com/macros/s/AKfycbzgVRGk1lEoxv_A7c1X4bdivQwUxIFEmoLt9LKwPVBv_h4Ti9AWbMXr_smUlm0NDlI6/exec',
     apiEndpoint: '/api/sheet-sync',
     autoSyncMs: 30000,
     storageKeys: {
@@ -32,9 +33,9 @@
     activeView: 'overview', // overview | month | week | date | circle | admin
     activeAdminSubTab: 'colonies', // colonies | sync | auth
     isAuthenticated: false,
-    adminUser: 'Admin',
+    adminUser: 'Keerthan Tunkoju',
     theme: localStorage.getItem('GHMC_THEME_V2') || 'light',
-    scriptUrl: localStorage.getItem(CONFIG.storageKeys.scriptUrl) || '',
+    scriptUrl: localStorage.getItem(CONFIG.storageKeys.scriptUrl) || 'https://script.google.com/macros/s/AKfycbzgVRGk1lEoxv_A7c1X4bdivQwUxIFEmoLt9LKwPVBv_h4Ti9AWbMXr_smUlm0NDlI6/exec',
     envWriteConfigured: false,
     syncMode: 'snapshot', // apps-script | gviz-csv | snapshot
     lastSyncedAt: null,
@@ -1399,13 +1400,18 @@ function doPost(e) {
      Admin Authentication, Credentials Management & Google Identity Integration
      ========================================================================== */
 
-  const DEFAULT_ADMIN_CREDS = { username: 'admin', password: 'admin123' };
+  const DEFAULT_ADMIN_CREDS = { username: 'Keerthan Tunkoju', password: '2001' };
   const DEFAULT_USER_CREDS = { username: 'user', password: 'user123' };
 
   function getStoredAdminCreds() {
     try {
       const saved = JSON.parse(localStorage.getItem(CONFIG.storageKeys.adminCreds) || 'null');
-      if (saved && saved.username && saved.password) return saved;
+      if (saved && saved.username && saved.password) {
+        if (saved.username === 'admin' && saved.password === 'admin123') {
+          return DEFAULT_ADMIN_CREDS;
+        }
+        return saved;
+      }
     } catch { /* default */ }
     return DEFAULT_ADMIN_CREDS;
   }

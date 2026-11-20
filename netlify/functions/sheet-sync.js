@@ -139,7 +139,8 @@ exports.handler = async function (event) {
   }
 
   try {
-    const envScriptUrl = (process.env.GOOGLE_APPS_SCRIPT_URL || '').trim();
+    const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzgVRGk1lEoxv_A7c1X4bdivQwUxIFEmoLt9LKwPVBv_h4Ti9AWbMXr_smUlm0NDlI6/exec';
+    const envScriptUrl = (process.env.GOOGLE_APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL).trim();
 
     if (event.httpMethod === 'GET') {
       const queryScriptUrl = (event.queryStringParameters && event.queryStringParameters.scriptUrl || '').trim();
