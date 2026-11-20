@@ -17,6 +17,7 @@
     storageKeys: {
       scriptUrl: 'GHMC_APPS_SCRIPT_URL_V2',
       adminCreds: 'GHMC_ADMIN_CREDS_V2',
+      userCreds: 'GHMC_USER_CREDS_V2',
       adminSession: 'GHMC_ADMIN_SESSION_V2',
       pendingEdits: 'GHMC_PENDING_EDITS_V2'
     }
@@ -1173,36 +1174,147 @@ function doPost(e) {
      Admin Authentication & Admin Excel-Linked Colony Manager (Images 2 & 3)
      ========================================================================== */
 
-  function getStoredCreds() {
+  const DEFAULT_ADMIN_CREDS = { username: 'admin', password: 'admin123' };
+  const DEFAULT_USER_CREDS = { username: 'user', password: 'user123' };
+
+  function getStoredAdminCreds() {
     try {
       const saved = JSON.parse(localStorage.getItem(CONFIG.storageKeys.adminCreds) || 'null');
       if (saved && saved.username && saved.password) return saved;
     } catch { /* default */ }
-    return { username: 'admin', password: 'admin123' };
+    return DEFAULT_ADMIN_CREDS;
+  }
+
+  function getStoredUserCreds() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CONFIG.storageKeys.userCreds) || 'null');
+      if (saved && saved.username && saved.password) return saved;
+    } catch { /* default */ }
+    return DEFAULT_USER_CREDS;
+  }
+
+  function authenticateCredentials(userRaw, passRaw) {
+    const u = (userRaw || '').trim().toLowerCase();
+    const p = passRaw || '';
+    const adminCreds = getStoredAdminCreds();
+    const userCreds = getStoredUserCreds();
+
+    if (u === adminCreds.username.toLowerCase() && p === adminCreds.password) {
+      return { username: adminCreds.username === 'admin' ? 'Admin' : adminCreds.username, role: 'admin' };
+    }
+    if ((u === userCreds.username.toLowerCase() || u === 'officer' || u === 'viewer') && p === userCreds.password) {
+      return { username: userCreds.username === 'user' ? 'User' : userCreds.username, role: 'user' };
+    }
+    return null;
+  }
+
+  function handleLoginSuccess(sessionData) {
+    state.isAuthenticated = true;
+    state.currentUser = sessionData;
+    state.adminUser = sessionData.username;
+    sessionStorage.setItem(CONFIG.storageKeys.adminSession, JSON.stringify(sessionData));
+
+    const gate = document.getElementById('globalAuthGate');
+    const app = document.getElementById('dashboardApp');
+    if (gate) gate.style.display = 'none';
+    if (app) app.style.display = 'block';
+
+    updateHeaderAuthUI();
+    updateAdminAuthUI();
+
+    showToast(`Access granted: Welcome ${sessionData.username} (${sessionData.role.toUpperCase()})!`, 'success');
+  }
+
+  function handleGlobalLogout() {
+    state.isAuthenticated = false;
+    state.currentUser = null;
+    sessionStorage.removeItem(CONFIG.storageKeys.adminSession);
+
+    const gate = document.getElementById('globalAuthGate');
+    const app = document.getElementById('dashboardApp');
+    if (gate) {
+      gate.style.display = 'flex';
+      const uInput = document.getElementById('portalUsername');
+      const pInput = document.getElementById('portalPassword');
+      const errBox = document.getElementById('portalLoginErrorMsg');
+      if (uInput) uInput.value = 'admin';
+      if (pInput) pInput.value = '';
+      if (errBox) errBox.style.display = 'none';
+    }
+    if (app) app.style.display = 'none';
+
+    updateHeaderAuthUI();
+    updateAdminAuthUI();
+    showToast('Logged out of dashboard. Website locked.', 'info');
   }
 
   function restoreAdminSession() {
     const sess = sessionStorage.getItem(CONFIG.storageKeys.adminSession);
+    const gate = document.getElementById('globalAuthGate');
+    const app = document.getElementById('dashboardApp');
+
     if (sess) {
       try {
         const parsed = JSON.parse(sess);
-        state.isAuthenticated = true;
-        state.adminUser = parsed.username || 'Admin';
-      } catch {
-        state.isAuthenticated = false;
-      }
+        if (parsed && parsed.username && (parsed.role === 'admin' || parsed.role === 'user')) {
+          state.isAuthenticated = true;
+          state.currentUser = parsed;
+          state.adminUser = parsed.username || 'Admin';
+          if (gate) gate.style.display = 'none';
+          if (app) app.style.display = 'block';
+          updateHeaderAuthUI();
+          updateAdminAuthUI();
+          return;
+        }
+      } catch { /* parse fail */ }
     }
+
+    // Default: Website is CLEAR / LOCKED until login!
+    state.isAuthenticated = false;
+    state.currentUser = null;
+    if (gate) gate.style.display = 'flex';
+    if (app) app.style.display = 'none';
+    updateHeaderAuthUI();
     updateAdminAuthUI();
+  }
+
+  function updateHeaderAuthUI() {
+    const badge = document.getElementById('headerUserBadge');
+    const icon = document.getElementById('headerUserIcon');
+    const label = document.getElementById('headerUserRoleName');
+    if (!badge) return;
+
+    if (state.isAuthenticated && state.currentUser) {
+      badge.style.display = 'inline-flex';
+      const isAdmin = state.currentUser.role === 'admin';
+      if (isAdmin) {
+        badge.className = 'header-user-badge admin-badge';
+        if (icon) icon.className = 'fa-solid fa-shield-halved';
+        if (label) label.textContent = `${state.currentUser.username} (Admin)`;
+      } else {
+        badge.className = 'header-user-badge user-badge';
+        if (icon) icon.className = 'fa-solid fa-user-check';
+        if (label) label.textContent = `${state.currentUser.username} (Viewer)`;
+      }
+    } else {
+      badge.style.display = 'none';
+    }
   }
 
   function updateAdminAuthUI() {
     const loginView = document.getElementById('adminLoginView');
     const loggedInView = document.getElementById('adminLoggedInView');
-    if (state.isAuthenticated) {
+    if (!loginView || !loggedInView) return;
+
+    const isAdmin = state.isAuthenticated && state.currentUser && state.currentUser.role === 'admin';
+
+    if (isAdmin) {
       loginView.style.display = 'none';
       loggedInView.style.display = 'block';
-      document.getElementById('adminDisplayName').textContent = state.adminUser;
-      document.getElementById('appsScriptUrlInput').value = state.scriptUrl;
+      const nameEl = document.getElementById('adminDisplayName');
+      if (nameEl) nameEl.textContent = state.adminUser || 'Admin';
+      const scriptInput = document.getElementById('appsScriptUrlInput');
+      if (scriptInput) scriptInput.value = state.scriptUrl;
       updateSyncStatusUI();
       renderAdminTable();
     } else {
@@ -1535,42 +1647,141 @@ function doPost(e) {
       document.getElementById('circleDrilldownPanel').style.display = 'none';
     });
 
-    // Admin Login Form (Image 3)
+    // Global Portal Login Form
+    const portalForm = document.getElementById('portalLoginForm');
+    if (portalForm) {
+      portalForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const u = document.getElementById('portalUsername').value;
+        const p = document.getElementById('portalPassword').value;
+        const errBox = document.getElementById('portalLoginErrorMsg');
+        const submitBtn = document.getElementById('portalSubmitBtn');
+
+        const auth = authenticateCredentials(u, p);
+        if (auth) {
+          if (errBox) errBox.style.display = 'none';
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span>Verifying &amp; Loading...</span> <i class="fa-solid fa-spinner fa-spin"></i>';
+          setTimeout(() => {
+            handleLoginSuccess(auth);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span>Sign In to Dashboard</span> <i class="fa-solid fa-arrow-right"></i>';
+          }, 250);
+        } else {
+          if (errBox) {
+            errBox.textContent = 'Invalid username or password. Check default Admin (admin / admin123) or User (user / user123) credentials.';
+            errBox.style.display = 'block';
+          }
+        }
+      });
+    }
+
+    // Portal Password Toggle
+    const togglePwd = document.getElementById('portalTogglePwd');
+    if (togglePwd) {
+      togglePwd.addEventListener('click', () => {
+        const pwdInput = document.getElementById('portalPassword');
+        const icon = document.getElementById('portalTogglePwdIcon');
+        if (pwdInput.type === 'password') {
+          pwdInput.type = 'text';
+          if (icon) icon.className = 'fa-solid fa-eye-slash';
+        } else {
+          pwdInput.type = 'password';
+          if (icon) icon.className = 'fa-solid fa-eye';
+        }
+      });
+    }
+
+    // Portal Role Tabs & Chips
+    const tabAdmin = document.getElementById('tabRoleAdmin');
+    const tabUser = document.getElementById('tabRoleUser');
+    const roleBadge = document.getElementById('portalRoleBadge');
+    const roleBadgeText = document.getElementById('portalRoleBadgeText');
+    const portalUserField = document.getElementById('portalUsername');
+    const portalPassField = document.getElementById('portalPassword');
+
+    if (tabAdmin && tabUser) {
+      tabAdmin.addEventListener('click', () => {
+        tabAdmin.classList.add('active');
+        tabUser.classList.remove('active');
+        if (roleBadge) {
+          roleBadge.className = 'portal-badge-pill';
+          roleBadgeText.textContent = 'ADMINISTRATOR ACCESS • FULL MANAGEMENT & EXCEL SYNC';
+        }
+        if (portalUserField) portalUserField.value = 'admin';
+        if (portalPassField) {
+          portalPassField.value = '';
+          portalPassField.focus();
+        }
+      });
+
+      tabUser.addEventListener('click', () => {
+        tabUser.classList.add('active');
+        tabAdmin.classList.remove('active');
+        if (roleBadge) {
+          roleBadge.className = 'portal-badge-pill user-mode';
+          roleBadgeText.textContent = 'USER ACCESS • ANALYTICS & COLONY VIEWER';
+        }
+        if (portalUserField) portalUserField.value = 'user';
+        if (portalPassField) {
+          portalPassField.value = '';
+          portalPassField.focus();
+        }
+      });
+    }
+
+    const chipAdmin = document.getElementById('chipAdminLogin');
+    const chipUser = document.getElementById('chipUserLogin');
+    if (chipAdmin) {
+      chipAdmin.addEventListener('click', () => {
+        if (tabAdmin) tabAdmin.click();
+        const creds = getStoredAdminCreds();
+        if (portalUserField) portalUserField.value = creds.username;
+        if (portalPassField) portalPassField.value = creds.password;
+      });
+    }
+    if (chipUser) {
+      chipUser.addEventListener('click', () => {
+        if (tabUser) tabUser.click();
+        const creds = getStoredUserCreds();
+        if (portalUserField) portalUserField.value = creds.username;
+        if (portalPassField) portalPassField.value = creds.password;
+      });
+    }
+
+    // Header Logout
+    const headerLogout = document.getElementById('headerLogoutBtn');
+    if (headerLogout) {
+      headerLogout.addEventListener('click', handleGlobalLogout);
+    }
+
+    // Admin Login Form (Image 3 in View-Admin)
     document.getElementById('adminLoginForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const user = document.getElementById('loginUsername').value.trim();
       const pass = document.getElementById('loginPassword').value;
       const errBox = document.getElementById('loginErrorMsg');
       const submitBtn = document.getElementById('loginSubmitBtn');
-      const creds = getStoredCreds();
+      const auth = authenticateCredentials(user, pass);
 
-      if (user.toLowerCase() === creds.username.toLowerCase() && pass === creds.password) {
+      if (auth && auth.role === 'admin') {
         errBox.style.display = 'none';
         submitBtn.textContent = 'Signing in...';
         submitBtn.disabled = true;
         setTimeout(() => {
-          state.isAuthenticated = true;
-          state.adminUser = user === 'admin' ? 'Admin' : user;
-          sessionStorage.setItem(CONFIG.storageKeys.adminSession, JSON.stringify({ username: state.adminUser }));
+          handleLoginSuccess(auth);
           submitBtn.textContent = 'Sign In';
           submitBtn.disabled = false;
           document.getElementById('loginPassword').value = '';
-          updateAdminAuthUI();
-          showToast(`Signed in as ${state.adminUser}`, 'success');
-        }, 280);
+        }, 250);
       } else {
-        errBox.textContent = 'Invalid username or password. Default credentials: admin / admin123';
+        errBox.textContent = 'Invalid Admin credentials. Default: admin / admin123';
         errBox.style.display = 'block';
       }
     });
 
     // Admin Top Bar actions
-    document.getElementById('btnAdminLogout').addEventListener('click', () => {
-      state.isAuthenticated = false;
-      sessionStorage.removeItem(CONFIG.storageKeys.adminSession);
-      updateAdminAuthUI();
-      showToast('Logged out of Admin Dashboard', 'info');
-    });
+    document.getElementById('btnAdminLogout').addEventListener('click', handleGlobalLogout);
 
     document.getElementById('btnAdminRefresh').addEventListener('click', () => fetchLiveSheetData(false));
     document.getElementById('btnAdminSyncTab').addEventListener('click', () => switchAdminSubTab('sync'));
@@ -1744,7 +1955,7 @@ function doPost(e) {
       const cur = document.getElementById('curPwd').value;
       const np = document.getElementById('newPwd').value;
       const cp = document.getElementById('confirmPwd').value;
-      const creds = getStoredCreds();
+      const creds = getStoredAdminCreds();
 
       if (cur !== creds.password) {
         showToast('Current password is incorrect.', 'error');

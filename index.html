@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -14,25 +15,91 @@
 
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
-  <div class="dashboard-shell">
+  <!-- ====================================================================
+       GLOBAL AUTHENTICATION GATE (Clear Website Until Admin / User Login)
+       ==================================================================== -->
+  <div id="globalAuthGate" class="portal-gate-overlay">
+    <div class="portal-card">
+      <div class="portal-card-header">
+        <div class="portal-logo-box">
+          <img src="assets/neogeo-selected-user-logo.png" alt="NeoGeo — NeoGeoinfo Technologies Limited"
+            class="portal-logo-img" />
+        </div>
+        <h1 class="portal-system-title">GHMC Project Colony Performance Management Dashboard</h1>
+        <p class="portal-system-sub">Secure Corporate Portal &bull; NeoGeoinfo Technologies Limited</p>
+      </div>
+
+      <div class="portal-rainbow-bar"></div>
+
+      <div class="portal-card-body">
+        <div class="portal-role-tabs" role="tablist">
+          <button type="button" class="portal-role-tab active" id="tabRoleAdmin" data-role="admin">
+            <i class="fa-solid fa-shield-halved"></i> Admin Login
+          </button>
+          <button type="button" class="portal-role-tab" id="tabRoleUser" data-role="user">
+            <i class="fa-solid fa-user-check"></i> User Login
+          </button>
+        </div>
+
+        <div class="portal-badge-pill" id="portalRoleBadge">
+          <span id="portalRoleBadgeText">ADMINISTRATOR ACCESS &bull; FULL MANAGEMENT &amp; EXCEL SYNC</span>
+        </div>
+
+        <div class="login-error" id="portalLoginErrorMsg" style="display: none;"></div>
+
+        <form id="portalLoginForm" autocomplete="off">
+          <div class="portal-field">
+            <label for="portalUsername">Username</label>
+            <div class="portal-input-wrap">
+              <i class="fa-solid fa-user portal-field-icon"></i>
+              <input type="text" id="portalUsername" class="portal-input" value="admin"
+                placeholder="Enter Username (admin / user)" required />
+            </div>
+          </div>
+
+          <div class="portal-field">
+            <label for="portalPassword">Password</label>
+            <div class="portal-input-wrap">
+              <i class="fa-solid fa-lock portal-field-icon"></i>
+              <input type="password" id="portalPassword" class="portal-input" placeholder="Enter Password" required />
+              <button type="button" class="portal-pwd-toggle" id="portalTogglePwd" title="Show/Hide Password">
+                <i class="fa-solid fa-eye" id="portalTogglePwdIcon"></i>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" id="portalSubmitBtn" class="portal-submit-btn">
+            <span>Sign In to Dashboard</span>
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </form>
+
+        <div class="portal-creds-helper">
+          <div class="portal-creds-title"><i class="fa-solid fa-key"></i> Authorized Credentials</div>
+          <div class="portal-creds-grid">
+            <div class="portal-cred-chip" id="chipAdminLogin" title="Click to autofill Admin credentials">
+              <div class="chip-role"><i class="fa-solid fa-shield-halved" style="color: #008a3e;"></i> Admin</div>
+              <div class="chip-details">admin / <strong>admin123</strong></div>
+            </div>
+            <div class="portal-cred-chip" id="chipUserLogin" title="Click to autofill User credentials">
+              <div class="chip-role"><i class="fa-solid fa-user-check" style="color: #2563eb;"></i> User</div>
+              <div class="chip-details">user / <strong>user123</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-shell" id="dashboardApp" style="display: none;">
 
     <!-- 1. Top Corporate NeoGeo Header -->
     <header class="top-banner">
       <div class="neogeo-logo-card">
-        <div class="neogeo-wordmark">
-          <span>Ne</span>
-          <span class="neogeo-globe" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="21" height="21" fill="none">
-              <circle cx="12" cy="12" r="10" fill="#e0f2fe" stroke="#2563eb" stroke-width="1.8"/>
-              <ellipse cx="12" cy="12" rx="4.5" ry="10" stroke="#2563eb" stroke-width="1.4"/>
-              <line x1="2.5" y1="9" x2="21.5" y2="9" stroke="#2563eb" stroke-width="1.3"/>
-              <line x1="2.5" y1="15" x2="21.5" y2="15" stroke="#2563eb" stroke-width="1.3"/>
-            </svg>
-          </span>
-          <span>Geo</span>
-        </div>
-        <div class="neogeo-tagline">&mdash; NeoGeoinfo Technologies Limited &mdash;</div>
+        <img src="assets/neogeo-selected-user-logo.png" alt="NeoGeo — NeoGeoinfo Technologies Limited"
+          class="neogeo-logo-img" />
       </div>
 
       <div class="header-center">
@@ -44,6 +111,14 @@
         <div class="live-badge-header" id="headerSyncBadge">
           <span class="pulse-dot" id="headerSyncDot"></span>
           <span id="headerSyncText">Google Sheet Linked</span>
+        </div>
+        <div class="header-user-badge" id="headerUserBadge" style="display: none;">
+          <i class="fa-solid fa-user-shield" id="headerUserIcon"></i>
+          <span id="headerUserRoleName">Admin</span>
+          <button type="button" class="header-logout-btn" id="headerLogoutBtn" title="Sign out of dashboard">
+            <i class="fa-solid fa-power-off"></i>
+            <span>Logout</span>
+          </button>
         </div>
       </div>
     </header>
@@ -191,14 +266,17 @@
           <span id="lastSyncTimeText">Updated just now</span>
         </span>
 
-        <label class="status-pill neutral" style="cursor: pointer;" title="Automatically check Google Sheet for status changes every 30 seconds">
+        <label class="status-pill neutral" style="cursor: pointer;"
+          title="Automatically check Google Sheet for status changes every 30 seconds">
           <input type="checkbox" id="autoSyncToggle" checked style="accent-color: #008a3e; cursor: pointer;" />
           <span>Auto-Sync 30s</span>
         </label>
       </div>
 
       <div class="tools-actions">
-        <a class="tool-btn" href="https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit?usp=sharing" target="_blank" rel="noopener">
+        <a class="tool-btn"
+          href="https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit?usp=sharing"
+          target="_blank" rel="noopener">
           <i class="fa-solid fa-arrow-up-right-from-square"></i>
           <span>Open Google Sheet</span>
         </a>
@@ -229,7 +307,8 @@
         <div>
           <span class="perf-badge" id="overviewStreamBadge">OVERALL PERFORMANCE</span>
           <h2 id="overviewHeading">Output Performance After 23-Jun-2026</h2>
-          <p id="overviewSubtext">Overall colony survey performance calculated live from Google Sheet COLONIES records</p>
+          <p id="overviewSubtext">Overall colony survey performance calculated live from Google Sheet COLONIES records
+          </p>
         </div>
         <div class="summary-chip-group" id="overviewStatusChips"></div>
       </section>
@@ -282,7 +361,8 @@
           <div>
             <strong style="font-size: 13px; color: var(--navy-dark);">Live Excel Data Breakdown</strong>
             <div style="font-size: 11.5px; color: var(--text-muted);" id="overviewBreakdownNote">
-              Synchronized directly with Google Sheet COLONIES tab. Changes made in Excel or Admin Dashboard reflect in real time.
+              Synchronized directly with Google Sheet COLONIES tab. Changes made in Excel or Admin Dashboard reflect in
+              real time.
             </div>
           </div>
           <button class="tool-btn teal" id="btnQuickGoAdmin">
@@ -420,7 +500,8 @@
         <div class="panel-header">
           <h3>Date-Wise Colony Output</h3>
           <div class="panel-controls">
-            <label for="dateWiseSelect" style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Select Date:</label>
+            <label for="dateWiseSelect" style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Select
+              Date:</label>
             <select id="dateWiseSelect" class="control-select"></select>
             <button class="tool-btn" id="btnShowAllDates">Show All Dates</button>
           </div>
@@ -455,7 +536,8 @@
         <div class="panel-header">
           <h3>Circle-Wise Colony Delivery &amp; Status Breakdown</h3>
           <div class="panel-controls">
-            <input type="text" id="circleSearchInput" class="control-input" placeholder="Search circle, ward, or colony..." />
+            <input type="text" id="circleSearchInput" class="control-input"
+              placeholder="Search circle, ward, or colony..." />
             <select id="circleFilterSelect" class="control-select">
               <option value="ALL">All Circles</option>
             </select>
@@ -519,7 +601,8 @@
             <span class="login-pill">ADMIN / QC WORK LOGIN</span>
             <h2>Admin Login</h2>
             <p class="login-desc">
-              The main dashboard remains open to everyone. Login is only for colony management &amp; live Excel status updates.
+              Administrator credentials required for colony performance editing, QC approval &amp; live Google Sheets
+              sync.
             </p>
             <div class="login-error" id="loginErrorMsg"></div>
             <form id="adminLoginForm" autocomplete="off">
@@ -532,7 +615,8 @@
               <button type="submit" id="loginSubmitBtn" class="login-submit-btn ready">Sign In</button>
             </form>
             <div class="login-hint">
-              Default Admin Login: <strong>admin</strong> / <strong>admin123</strong> (you can change password after sign-in)
+              Default Admin Login: <strong>admin</strong> / <strong>admin123</strong> (you can change password after
+              sign-in)
             </div>
           </div>
         </div>
@@ -581,7 +665,8 @@
           <div class="sync-banner setup-needed" id="adminSyncStatusBanner">
             <div id="adminSyncStatusMsg">
               <i class="fa-solid fa-circle-info"></i>
-              <strong>Live Read Connected!</strong> Connect your 60-second Google Apps Script URL in <em>Excel 2-Way Sync Setup</em> to push status updates directly back into Google Sheets.
+              <strong>Live Read Connected!</strong> Connect your 60-second Google Apps Script URL in <em>Excel 2-Way
+                Sync Setup</em> to push status updates directly back into Google Sheets.
             </div>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
               <button class="tool-btn primary" id="btnPushPendingAll" style="display: none;">
@@ -595,7 +680,8 @@
           <div class="panel-header">
             <h3>Excel Linked Colonies (Google Sheet: COLONIES)</h3>
             <div class="panel-controls">
-              <input type="text" id="adminSearchInput" class="control-input" placeholder="Search SNO, circle, ward, colony..." style="min-width: 230px;" />
+              <input type="text" id="adminSearchInput" class="control-input"
+                placeholder="Search SNO, circle, ward, colony..." style="min-width: 230px;" />
               <select id="adminStatusFilter" class="control-select">
                 <option value="ALL">All Statuses</option>
                 <option value="COMPLETED">COMPLETED</option>
@@ -657,9 +743,11 @@
               <tbody id="adminTableBody"></tbody>
             </table>
           </div>
-          <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 11.5px; color: var(--text-muted);">
+          <div
+            style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 11.5px; color: var(--text-muted);">
             <span id="adminTableCountInfo">Showing 0 records</span>
-            <span>Tip: Change any Status, Finalized Count, Date, or Reason and click <strong>Save</strong> to update both Dashboard &amp; Excel.</span>
+            <span>Tip: Change any Status, Finalized Count, Date, or Reason and click <strong>Save</strong> to update
+              both Dashboard &amp; Excel.</span>
           </div>
         </div>
 
@@ -667,18 +755,23 @@
         <div id="adminSubSync" class="panel-card" style="display: none;">
           <div class="panel-header">
             <h3>Two-Way Google Sheets Sync Configuration</h3>
-            <a class="tool-btn" href="https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit?usp=sharing" target="_blank" rel="noopener">
+            <a class="tool-btn"
+              href="https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit?usp=sharing"
+              target="_blank" rel="noopener">
               <i class="fa-solid fa-table"></i>
               <span>Open Linked Google Sheet</span>
             </a>
           </div>
 
-          <div style="background: #f8fafc; border: 1px solid var(--border-card); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
-            <label for="appsScriptUrlInput" style="display: block; font-size: 11.5px; font-weight: 800; color: var(--navy-dark); text-transform: uppercase; margin-bottom: 6px;">
+          <div
+            style="background: #f8fafc; border: 1px solid var(--border-card); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+            <label for="appsScriptUrlInput"
+              style="display: block; font-size: 11.5px; font-weight: 800; color: var(--navy-dark); text-transform: uppercase; margin-bottom: 6px;">
               Google Apps Script Web App URL (for live Admin &rarr; Google Sheet writes)
             </label>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <input type="url" id="appsScriptUrlInput" class="control-input" style="flex: 1; min-width: 280px;" placeholder="https://script.google.com/macros/s/.../exec" />
+              <input type="url" id="appsScriptUrlInput" class="control-input" style="flex: 1; min-width: 280px;"
+                placeholder="https://script.google.com/macros/s/.../exec" />
               <button class="tool-btn teal" id="btnTestSaveScriptUrl">
                 <i class="fa-solid fa-plug-circle-check"></i>
                 <span>Test &amp; Connect</span>
@@ -686,7 +779,9 @@
               <button class="tool-btn danger-outline" id="btnClearScriptUrl">Disconnect</button>
             </div>
             <p style="font-size: 11.5px; color: var(--text-muted); margin-top: 8px;">
-              <strong>Netlify Deployment Tip:</strong> You can also add <code>GOOGLE_APPS_SCRIPT_URL</code> in Netlify &rarr; <em>Site configuration &rarr; Environment variables</em> so every admin browser connects automatically.
+              <strong>Netlify Deployment Tip:</strong> You can also add <code>GOOGLE_APPS_SCRIPT_URL</code> in Netlify
+              &rarr; <em>Site configuration &rarr; Environment variables</em> so every admin browser connects
+              automatically.
             </p>
           </div>
 
@@ -694,12 +789,19 @@
             60-Second Setup to Enable Live Excel Write-Back
           </h4>
           <ol class="setup-steps">
-            <li>Open your Google Sheet: <a href="https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit?usp=sharing" target="_blank" rel="noopener">GHMC COLONIES Sheet</a>.</li>
+            <li>Open your Google Sheet: <a
+                href="https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit?usp=sharing"
+                target="_blank" rel="noopener">GHMC COLONIES Sheet</a>.</li>
             <li>Click <strong>Extensions &rarr; Apps Script</strong> from the top menu.</li>
-            <li>Replace any code in <code>Code.gs</code> with the script below (also saved in <code>google-apps-script/Code.gs</code> inside your project ZIP).</li>
-            <li>Click <strong>Save</strong>, then click <strong>Deploy &rarr; New deployment &rarr; Web app</strong>.</li>
-            <li>Set <strong>Execute as:</strong> <em>Me</em> and <strong>Who has access:</strong> <em>Anyone</em>, then click <strong>Deploy</strong>.</li>
-            <li>Copy the <strong>Web app URL</strong> (ending with <code>/exec</code>), paste it in the box above, and click <strong>Test &amp; Connect</strong>!</li>
+            <li>Replace any code in <code>Code.gs</code> with the script below (also saved in
+              <code>google-apps-script/Code.gs</code> inside your project ZIP).
+            </li>
+            <li>Click <strong>Save</strong>, then click <strong>Deploy &rarr; New deployment &rarr; Web app</strong>.
+            </li>
+            <li>Set <strong>Execute as:</strong> <em>Me</em> and <strong>Who has access:</strong> <em>Anyone</em>, then
+              click <strong>Deploy</strong>.</li>
+            <li>Copy the <strong>Web app URL</strong> (ending with <code>/exec</code>), paste it in the box above, and
+              click <strong>Test &amp; Connect</strong>!</li>
           </ol>
 
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -715,7 +817,8 @@
     </section>
 
     <footer class="dashboard-footer">
-      GHMC Project Colony Performance Management Dashboard &bull; Live Source: Google Sheets (COLONIES) &bull; NeoGeoinfo Technologies Limited
+      GHMC Project Colony Performance Management Dashboard &bull; Live Source: Google Sheets (COLONIES) &bull;
+      NeoGeoinfo Technologies Limited
     </footer>
   </div>
 
@@ -731,7 +834,8 @@
           <div class="form-grid">
             <div class="form-group">
               <label for="newCircle">Circle *</label>
-              <input type="text" id="newCircle" class="control-input" list="circlesDatalist" required placeholder="e.g. 24-KUKATPALLY" />
+              <input type="text" id="newCircle" class="control-input" list="circlesDatalist" required
+                placeholder="e.g. 24-KUKATPALLY" />
               <datalist id="circlesDatalist"></datalist>
             </div>
             <div class="form-group">
@@ -765,7 +869,8 @@
             </div>
             <div class="form-group full">
               <label for="newReason">Reason / Remarks</label>
-              <input type="text" id="newReason" class="control-input" placeholder="e.g. COMPLETED / Three Layers to All Layers / SENT TO FIELD" />
+              <input type="text" id="newReason" class="control-input"
+                placeholder="e.g. COMPLETED / Three Layers to All Layers / SENT TO FIELD" />
             </div>
           </div>
         </div>
@@ -814,4 +919,5 @@
   <script src="data/initial-data.js"></script>
   <script src="app.js"></script>
 </body>
+
 </html>
