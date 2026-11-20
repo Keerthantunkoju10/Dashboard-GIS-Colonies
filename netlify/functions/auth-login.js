@@ -3,8 +3,8 @@
  * Authenticates Admin and User logins using Netlify environment variables.
  *
  * Supported environment variables:
- * - ADMIN_USERNAME (default: admin)
- * - ADMIN_PASSWORD (default: admin123)
+ * - ADMIN_USERNAME (default: Keerthan Tunkoju)
+ * - ADMIN_PASSWORD (default: 2001)
  * - USER_USERNAME  (default: user)
  * - USER_PASSWORD  (default: user123)
  */
