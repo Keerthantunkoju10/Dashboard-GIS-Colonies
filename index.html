@@ -22,6 +22,9 @@
        ==================================================================== -->
   <div id="globalAuthGate" class="portal-gate-overlay">
     <div class="portal-card">
+      <button type="button" class="portal-theme-btn" id="portalThemeToggleBtn" title="Toggle Theme (Light / Dark)">
+        <i class="fa-solid fa-moon" id="portalThemeToggleIcon"></i>
+      </button>
       <div class="portal-card-header">
         <div class="portal-logo-box">
           <img src="assets/neogeo-selected-user-logo.png" alt="NeoGeo — NeoGeoinfo Technologies Limited"
@@ -54,8 +57,8 @@
             <label for="portalUsername">Username</label>
             <div class="portal-input-wrap">
               <i class="fa-solid fa-user portal-field-icon"></i>
-              <input type="text" id="portalUsername" class="portal-input" value="admin"
-                placeholder="Enter Username (admin / user)" required />
+              <input type="text" id="portalUsername" class="portal-input"
+                placeholder="Enter Username" required />
             </div>
           </div>
 
@@ -75,20 +78,6 @@
             <i class="fa-solid fa-arrow-right"></i>
           </button>
         </form>
-
-        <div class="portal-creds-helper">
-          <div class="portal-creds-title"><i class="fa-solid fa-key"></i> Authorized Credentials</div>
-          <div class="portal-creds-grid">
-            <div class="portal-cred-chip" id="chipAdminLogin" title="Click to autofill Admin credentials">
-              <div class="chip-role"><i class="fa-solid fa-shield-halved" style="color: #008a3e;"></i> Admin</div>
-              <div class="chip-details">admin / <strong>admin123</strong></div>
-            </div>
-            <div class="portal-cred-chip" id="chipUserLogin" title="Click to autofill User credentials">
-              <div class="chip-role"><i class="fa-solid fa-user-check" style="color: #2563eb;"></i> User</div>
-              <div class="chip-details">user / <strong>user123</strong></div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -108,6 +97,10 @@
       </div>
 
       <div class="header-right">
+        <button type="button" class="theme-toggle-btn" id="headerThemeToggleBtn" title="Toggle Theme (Light / Dark)">
+          <i class="fa-solid fa-moon" id="headerThemeToggleIcon"></i>
+          <span id="headerThemeToggleText">Dark</span>
+        </button>
         <div class="live-badge-header" id="headerSyncBadge">
           <span class="pulse-dot" id="headerSyncDot"></span>
           <span id="headerSyncText">Google Sheet Linked</span>
@@ -128,7 +121,7 @@
       <button class="primary-tab active" data-source="fresh">
         <div class="pt-title">
           <span>1. Fresh Data</span>
-          <span class="pt-count" id="countFresh">166</span>
+          <span class="pt-count" id="countFresh">0</span>
         </div>
         <div class="pt-sub">Current GHMC dashboard</div>
       </button>
@@ -136,7 +129,7 @@
       <button class="primary-tab" data-source="resubmit">
         <div class="pt-title">
           <span>2. Resubmit Data</span>
-          <span class="pt-count" id="countResubmit">36</span>
+          <span class="pt-count" id="countResubmit">0</span>
         </div>
         <div class="pt-sub">Live resubmit &amp; hold performance</div>
       </button>
@@ -144,7 +137,7 @@
       <button class="primary-tab" data-source="layers">
         <div class="pt-title">
           <span>3. 3Layers Data</span>
-          <span class="pt-count" id="countLayers">18</span>
+          <span class="pt-count" id="countLayers">0</span>
         </div>
         <div class="pt-sub">Colony delivery performance</div>
       </button>
@@ -266,7 +259,7 @@
       <div class="tools-status-pills">
         <span class="status-pill" id="syncLivePill">
           <span class="pulse-dot" id="syncPillDot"></span>
-          <span id="syncPillText">Live Sheet: 166 Rows</span>
+          <span id="syncPillText">Live Sheet: 0 Rows</span>
         </span>
 
         <span class="status-pill neutral" id="lastSyncTimePill">
@@ -693,10 +686,6 @@
               </div>
               <button type="submit" id="loginSubmitBtn" class="login-submit-btn ready">Sign In</button>
             </form>
-            <div class="login-hint">
-              Default Admin Login: <strong>admin</strong> / <strong>admin123</strong> (you can change password after
-              sign-in)
-            </div>
           </div>
         </div>
       </div>
@@ -707,12 +696,12 @@
         <div class="admin-user-bar">
           <div class="admin-user-info">
             <h3 id="adminDisplayName">Admin</h3>
-            <span>ADMINISTRATOR &bull; EXCEL LIVE LINKED</span>
+            <span id="adminDisplayRoleSub">ADMINISTRATOR &bull; EXCEL LIVE LINKED</span>
           </div>
           <div class="tools-actions">
             <button class="tool-btn teal" id="btnOpenChangePwd">
-              <i class="fa-solid fa-key"></i>
-              <span>Change Password</span>
+              <i class="fa-solid fa-user-gear"></i>
+              <span>Update Admin Credentials</span>
             </button>
             <button class="tool-btn" id="btnOpenAddColony">
               <i class="fa-solid fa-plus"></i>
@@ -737,6 +726,7 @@
         <div class="admin-subtabs">
           <button class="admin-subtab active" data-admintab="colonies">Excel Linked Colonies</button>
           <button class="admin-subtab" data-admintab="sync">Excel 2-Way Sync Setup</button>
+          <button class="admin-subtab" data-admintab="auth"><i class="fa-solid fa-sliders"></i> Admin Security &amp; Theme</button>
         </div>
 
         <!-- Sub-Tab 1: Excel Linked Colonies Table (Matches Image 2) -->
@@ -892,6 +882,99 @@
           </div>
           <pre class="code-block" id="appsScriptPreview"></pre>
         </div>
+
+        <!-- Sub-Tab 3: Admin Security & Theme Settings -->
+        <div id="adminSubAuth" class="panel-card" style="display: none;">
+          <div class="panel-header">
+            <h3><i class="fa-solid fa-shield-halved" style="color: #008a3e;"></i> Admin Security &amp; Theme Appearance</h3>
+            <span class="live-pill active" id="authSecurityBadge">Active &amp; Protected</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px;">
+            <!-- Card 1: Admin Credentials Management -->
+            <div style="background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 12px; padding: 18px; box-shadow: var(--shadow-sm);">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <h4 style="font-size: 15px; font-weight: 800; color: var(--navy-dark); margin: 0;">
+                  <i class="fa-solid fa-user-shield" style="color: #2563eb;"></i> Administrator Account
+                </h4>
+                <span class="badge-role" style="background: #dbeafe; color: #1e40af; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px;">CREDENTIALS</span>
+              </div>
+              <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+                Update the master Admin username and password for colony editing, QC verification, and live write-back access.
+              </p>
+
+              <form id="inlineAdminCredsForm">
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label for="inlineCurPwd" style="font-size: 11.5px; font-weight: 700;">Current Admin Password <span style="color:#ef4444;">*</span></label>
+                  <input type="password" id="inlineCurPwd" class="control-input" placeholder="Verify current password" required />
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label for="inlineNewUsername" style="font-size: 11.5px; font-weight: 700;">Admin Username <span style="color:#ef4444;">*</span></label>
+                  <input type="text" id="inlineNewUsername" class="control-input" placeholder="e.g. admin" minlength="3" required />
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label for="inlineNewPwd" style="font-size: 11.5px; font-weight: 700;">New Password (optional)</label>
+                  <input type="password" id="inlineNewPwd" class="control-input" placeholder="Leave empty to keep current password" minlength="4" />
+                </div>
+                <div class="form-group" style="margin-bottom: 14px;">
+                  <label for="inlineConfirmPwd" style="font-size: 11.5px; font-weight: 700;">Confirm New Password</label>
+                  <input type="password" id="inlineConfirmPwd" class="control-input" placeholder="Confirm new password" />
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button type="submit" class="tool-btn teal" style="flex: 1;">
+                    <i class="fa-solid fa-check"></i> Update Admin Account
+                  </button>
+                  <button type="button" class="tool-btn danger-outline" id="btnResetDefaultCreds" title="Reset back to admin/admin123">
+                    <i class="fa-solid fa-rotate-left"></i> Reset
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Card 2: Theme & Appearance Preferences -->
+            <div style="background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 12px; padding: 18px; box-shadow: var(--shadow-sm);">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <h4 style="font-size: 15px; font-weight: 800; color: var(--navy-dark); margin: 0;">
+                  <i class="fa-solid fa-palette" style="color: #6366f1;"></i> Theme &amp; Visual Appearance
+                </h4>
+                <span class="badge-role" id="themeActiveBadge" style="background: #e0e7ff; color: #4338ca; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px;">LIGHT THEME</span>
+              </div>
+              <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+                Customize the dashboard appearance. Switch between crisp Corporate Day (Light) and High-Contrast GIS Night (Dark) mode.
+              </p>
+
+              <div class="theme-picker-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+                <div class="theme-choice-card active" id="themeChoiceLight" data-theme-val="light">
+                  <div class="theme-preview-box light">
+                    <div class="t-bar"></div>
+                    <div class="t-content"></div>
+                  </div>
+                  <div class="theme-choice-label">
+                    <i class="fa-solid fa-sun" style="color: #f59e0b;"></i> Light Mode
+                  </div>
+                  <span class="theme-sub">Crisp Corporate Day</span>
+                </div>
+
+                <div class="theme-choice-card" id="themeChoiceDark" data-theme-val="dark">
+                  <div class="theme-preview-box dark">
+                    <div class="t-bar"></div>
+                    <div class="t-content"></div>
+                  </div>
+                  <div class="theme-choice-label">
+                    <i class="fa-solid fa-moon" style="color: #6366f1;"></i> Dark Mode
+                  </div>
+                  <span class="theme-sub">Executive GIS Night</span>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="tool-btn teal" id="btnApplyThemeToggle" style="flex: 1;">
+                  <i class="fa-solid fa-circle-half-stroke"></i> Toggle Light / Dark Mode
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1036,31 +1119,42 @@
     </div>
   </div>
 
-  <!-- Change Password Modal -->
+  <!-- Update Admin Credentials Modal -->
   <div class="modal-backdrop" id="changePwdModal">
-    <div class="modal-dialog" style="max-width: 420px;">
+    <div class="modal-dialog" style="max-width: 440px;">
       <div class="modal-header">
-        <h3><i class="fa-solid fa-key"></i> Change Admin Password</h3>
+        <h3><i class="fa-solid fa-user-shield"></i> Update Admin Credentials</h3>
         <button class="modal-close" data-close-modal="changePwdModal">&times;</button>
       </div>
       <form id="changePwdForm">
         <div class="modal-body">
-          <div class="form-group" style="margin-bottom: 10px;">
-            <label for="curPwd">Current Password</label>
-            <input type="password" id="curPwd" class="control-input" required />
+          <div class="admin-cred-notice">
+            <i class="fa-solid fa-circle-info"></i> Update your Administrator username and/or password. Enter your current password to authorize changes.
           </div>
-          <div class="form-group" style="margin-bottom: 10px;">
-            <label for="newPwd">New Password (min 4 chars)</label>
-            <input type="password" id="newPwd" class="control-input" minlength="4" required />
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label for="curPwd">Current Password <span style="color:#ef4444;">*</span></label>
+            <input type="password" id="curPwd" class="control-input" placeholder="Enter current admin password" required />
+          </div>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label for="newAdminUsername">Admin Username <span style="color:#ef4444;">*</span></label>
+            <input type="text" id="newAdminUsername" class="control-input" placeholder="Enter admin username" minlength="3" required />
+            <small style="color: #64748b; font-size: 11px; display: block; margin-top: 3px;">
+              Active Username: <strong id="currentAdminUsernameDisplay">admin</strong>
+            </small>
+          </div>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label for="newPwd">New Password</label>
+            <input type="password" id="newPwd" class="control-input" placeholder="Leave blank to keep current password" minlength="4" />
+            <small style="color: #64748b; font-size: 11px; display: block; margin-top: 3px;">Minimum 4 characters (optional)</small>
           </div>
           <div class="form-group">
             <label for="confirmPwd">Confirm New Password</label>
-            <input type="password" id="confirmPwd" class="control-input" minlength="4" required />
+            <input type="password" id="confirmPwd" class="control-input" placeholder="Re-enter new password" />
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="tool-btn" data-close-modal="changePwdModal">Cancel</button>
-          <button type="submit" class="tool-btn teal">Update Password</button>
+          <button type="submit" class="tool-btn teal"><i class="fa-solid fa-floppy-disk"></i> Save Admin Credentials</button>
         </div>
       </form>
     </div>
@@ -1069,8 +1163,7 @@
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <!-- Embedded Snapshot + Main Application -->
-  <script src="data/initial-data.js"></script>
+  <!-- Main Application -->
   <script src="app.js"></script>
 </body>
 

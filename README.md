@@ -16,9 +16,16 @@ Live executive colony analytics dashboard & Excel-linked Admin Suite built for *
    - Export to **CSV**, **Excel (`.xlsx`)**, and **Print / PDF**.
    - **Auto-Sync (every 30s)** + manual **Refresh Data** pulls live edits made directly in Google Sheets.
 
-2. **Admin / QC Work Dashboard (Live Two-Way Excel Integration)**
-   - Secure login screen (**Default credentials**: `admin` / `admin123`, changeable inside Admin via **Change Password**).
-   - Public dashboard stays open to everyone; login is only required for colony editing and Google Sheet write-back.
+2. **Admin / QC Work Dashboard & Security Suite**
+   - **Theme Change Option (Light / Dark Mode)**:
+     - 1-click theme switcher in the top corporate header banner and on the portal login screen.
+     - Dedicated **Theme & Visual Appearance** preferences card inside the Admin suite.
+     - Smooth instant transition between crisp Corporate Day (Light) and High-Contrast GIS Night (Dark) mode, with full Chart.js and data table theme adaptation. Persisted across sessions via `localStorage`.
+   - **Admin Username & Password Update**:
+     - Fast modal access via **Update Admin Credentials** button in the Admin top bar to update both the master Admin username and password (with current password verification).
+     - Dedicated **Admin Security & Theme** tab in the Admin suite for credentials management, credential reset to defaults, and active security oversight.
+   - **Default credentials**: `admin` / `admin123` (or User viewer: `user` / `user123`), fully customizable.
+   - Public dashboard remains protected behind secure authentication gate until sign-in.
    - **6 pastel summary cards** (`Total Records`, `Finalized Count`, `Completed`, `In Progress`, `Hold`, `Rejected / No Final`).
    - **Full inline-editable table** of every row in Google Sheets (`COLONIES`): update **Status**, **Dashboard Count**, **Finalized Count**, **Alloted Date**, or **Reason** and click **Save** to update BOTH the Google Sheet and the Dashboard immediately.
    - **+ Add Colony** modal appends new colonies directly into the next open row of the `COLONIES` sheet.
@@ -78,21 +85,67 @@ Now:
 
 ---
 
+## 3. Netlify Environment Variables & Admin Login (.env)
+
+The project includes serverless authentication powered by Netlify Environment Variables (`netlify/functions/auth-login.js`).
+
+### Configuring Environment Variables
+
+#### For Local Development
+The project includes a `.env` file (and `.env.example` template):
+```env
+# Administrator Login Credentials (Used for secure Netlify Admin login)
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin123
+
+# Standard User Login Credentials
+USER_USERNAME=user
+USER_PASSWORD=user123
+
+# Google Sheets Configuration
+GOOGLE_SHEET_ID=1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE
+GOOGLE_SHEET_NAME=COLONIES
+
+# Google Apps Script Web App URL (optional, for live 2-way write-back)
+GOOGLE_APPS_SCRIPT_URL=
+```
+
+Run locally with Netlify CLI:
+```bash
+npx netlify dev
+```
+
+#### For Netlify Production Deployment
+1. Go to your site in [Netlify Dashboard](https://app.netlify.com).
+2. Navigate to **Site configuration → Environment variables**.
+3. Add the following variables:
+   - `ADMIN_USERNAME`: Your custom Admin username (e.g. `admin` or your company username)
+   - `ADMIN_PASSWORD`: Your secure Admin password
+   - `USER_USERNAME`: Standard user viewer username (e.g. `user`)
+   - `USER_PASSWORD`: Standard user password (e.g. `user123`)
+   - `GOOGLE_SHEET_ID`: `1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE`
+   - `GOOGLE_SHEET_NAME`: `COLONIES`
+   - `GOOGLE_APPS_SCRIPT_URL`: *(Your deployed Google Apps Script `/exec` URL)*
+4. Trigger a new deploy. Any login attempt on the Netlify site will authenticate against these secure environment variables!
+
+---
+
 ## Project Structure
 
 ```text
 ghmc-colony-dashboard/
 ├── index.html                      # Complete Dashboard & Admin UI
 ├── styles.css                      # NeoGeo corporate theme matching reference designs
-├── app.js                          # Analytics engine, live sync, inline Admin editor
-├── data/
-│   └── initial-data.js             # Embedded snapshot from live Google Sheet (fallback)
+├── app.js                          # Analytics engine, live sync, inline Admin editor & auth
+├── .env                            # Netlify environment variables (Admin credentials & config)
+├── .env.example                    # Template for version control
 ├── netlify/
 │   └── functions/
+│       ├── auth-login.js           # Netlify serverless auth function using .env credentials
 │       └── sheet-sync.js           # Zero-dependency Netlify Function (GET/POST Google Sheets)
 ├── google-apps-script/
 │   └── Code.gs                     # Paste into Google Sheet Apps Script for 2-way write-back
-├── netlify.toml                    # Netlify publish, functions & /api/sheet-sync redirect
+├── netlify.toml                    # Netlify publish, functions & /api redirects
 ├── package.json                    # Project metadata & dev scripts
 ├── .gitignore
 └── README.md

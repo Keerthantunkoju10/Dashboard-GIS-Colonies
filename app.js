@@ -21,7 +21,8 @@
       adminSession: 'GHMC_ADMIN_SESSION_V2',
       pendingEdits: 'GHMC_PENDING_EDITS_V2',
       workspaceData: 'GHMC_WORKSPACE_COLONIES_V2',
-      deletedRows: 'GHMC_DELETED_ROWS_V2'
+      deletedRows: 'GHMC_DELETED_ROWS_V2',
+      theme: 'GHMC_THEME_V2'
     }
   };
 
@@ -29,9 +30,10 @@
     allColonies: [],
     activeSource: 'fresh', // fresh | resubmit | layers
     activeView: 'overview', // overview | month | week | date | circle | admin
-    activeAdminSubTab: 'colonies', // colonies | sync
+    activeAdminSubTab: 'colonies', // colonies | sync | auth
     isAuthenticated: false,
     adminUser: 'Admin',
+    theme: localStorage.getItem('GHMC_THEME_V2') || 'light',
     scriptUrl: localStorage.getItem(CONFIG.storageKeys.scriptUrl) || '',
     envWriteConfigured: false,
     syncMode: 'snapshot', // apps-script | gviz-csv | snapshot
@@ -509,7 +511,7 @@ function doPost(e) {
 
   function reconcileColoniesWithRemote(localRecords, remoteRecords) {
     if (!remoteRecords || !remoteRecords.length) return localRecords || [];
-    const baseLocal = (localRecords && localRecords.length) ? localRecords : ((window.GHMC_INITIAL_DATA && window.GHMC_INITIAL_DATA.colonies) || []);
+    const baseLocal = (localRecords && localRecords.length) ? localRecords : [];
     const deleted = new Set(loadDeletedRows().map(String));
 
     const remoteMap = new Map();
@@ -652,13 +654,10 @@ function doPost(e) {
       if (!silent) {
         showToast(`Synced ${state.allColonies.length} verified records with Google Sheet (${CONFIG.sheetName})`, 'success');
       }
-    } else if (state.allColonies.length === 0 && window.GHMC_INITIAL_DATA) {
-      state.allColonies = mergePendingEdits(window.GHMC_INITIAL_DATA.colonies || []);
-      saveWorkspaceData();
-      state.syncMode = 'snapshot';
-      state.lastSyncedAt = new Date();
+    } else if (state.allColonies.length === 0) {
+      state.syncMode = 'unlinked';
       if (!silent) {
-        showToast('Loaded embedded Excel snapshot (offline fallback)', 'warn');
+        showToast('No records retrieved from linked Excel / Google Sheet.', 'warn');
       }
     }
 
@@ -725,16 +724,16 @@ function doPost(e) {
     if (headerText) {
       headerText.textContent = writeReady
         ? '2-Way Excel Sync Active'
-        : (state.syncMode === 'snapshot' ? 'Excel Snapshot Loaded' : 'Google Sheet Live Read');
+        : (count === 0 ? 'Google Sheet Linked (0 Rows)' : 'Google Sheet Live Read');
     }
     if (headerDot) {
-      headerDot.classList.toggle('amber', state.syncMode === 'snapshot');
+      headerDot.classList.toggle('amber', count === 0);
     }
     if (syncPillText) {
-      syncPillText.textContent = `${state.syncMode === 'snapshot' ? 'Snapshot' : 'Live Sheet'}: ${count} Rows`;
+      syncPillText.textContent = `Live Sheet: ${count} Rows`;
     }
     if (syncPillDot) {
-      syncPillDot.classList.toggle('amber', state.syncMode === 'snapshot');
+      syncPillDot.classList.toggle('amber', count === 0);
     }
     if (lastSyncTimeText && state.lastSyncedAt) {
       lastSyncTimeText.textContent = `Updated ${state.lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -1397,7 +1396,7 @@ function doPost(e) {
   }
 
   /* ==========================================================================
-     Admin Authentication & Admin Excel-Linked Colony Manager (Images 2 & 3)
+     Admin Authentication, Credentials Management & Google Identity Integration
      ========================================================================== */
 
   const DEFAULT_ADMIN_CREDS = { username: 'admin', password: 'admin123' };
@@ -1419,19 +1418,169 @@ function doPost(e) {
     return DEFAULT_USER_CREDS;
   }
 
-  function authenticateCredentials(userRaw, passRaw) {
-    const u = (userRaw || '').trim().toLowerCase();
+  function updateCredsDisplay() {
+    const creds = getStoredAdminCreds();
+    const currentDisp = document.getElementById('currentAdminUsernameDisplay');
+    if (currentDisp) {
+      currentDisp.textContent = creds.username;
+    }
+
+    const inlineNewUser = document.getElementById('inlineNewUsername');
+    if (inlineNewUser && !inlineNewUser.value) {
+      inlineNewUser.value = creds.username;
+    }
+    const newAdminUserInput = document.getElementById('newAdminUsername');
+    if (newAdminUserInput && !newAdminUserInput.value) {
+      newAdminUserInput.value = creds.username;
+    }
+  }
+
+  function saveAdminCredentials(newUsername, newPassword) {
+    const u = (newUsername || '').trim();
+    const p = (newPassword || '').trim();
+
+    if (!u || u.length < 3) {
+      showToast('Admin username must be at least 3 characters.', 'error');
+      return false;
+    }
+    if (p && p.length < 4) {
+      showToast('New password must be at least 4 characters.', 'error');
+      return false;
+    }
+
+    const current = getStoredAdminCreds();
+    const targetPassword = p || current.password;
+    const updatedCreds = {
+      username: u,
+      password: targetPassword,
+      updatedAt: new Date().toISOString()
+    };
+
+    localStorage.setItem(CONFIG.storageKeys.adminCreds, JSON.stringify(updatedCreds));
+    state.adminUser = u;
+
+    if (state.currentUser && state.currentUser.role === 'admin') {
+      state.currentUser.username = u;
+      sessionStorage.setItem(CONFIG.storageKeys.adminSession, JSON.stringify(state.currentUser));
+    }
+
+    updateCredsDisplay();
+    updateHeaderAuthUI();
+    updateAdminAuthUI();
+    return true;
+  }
+
+  async function authenticateCredentials(userRaw, passRaw) {
+    const u = (userRaw || '').trim();
     const p = passRaw || '';
+
+    // 1. Try Netlify Serverless Function authentication (/api/auth-login)
+    //    Validates securely against Netlify environment variables: ADMIN_USERNAME & ADMIN_PASSWORD
+    try {
+      const res = await fetch('/api/auth-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u, password: p })
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.authenticated && json.user) {
+          return json.user;
+        }
+      }
+    } catch {
+      // Backend unavailable / offline / local preview without Netlify dev
+    }
+
+    // 2. Local fallback / offline authentication (localStorage and defaults)
     const adminCreds = getStoredAdminCreds();
     const userCreds = getStoredUserCreds();
 
-    if (u === adminCreds.username.toLowerCase() && p === adminCreds.password) {
-      return { username: adminCreds.username === 'admin' ? 'Admin' : adminCreds.username, role: 'admin' };
+    if (u.toLowerCase() === adminCreds.username.toLowerCase() && p === adminCreds.password) {
+      return { username: adminCreds.username === 'admin' ? 'Admin' : adminCreds.username, role: 'admin', authMethod: 'local' };
     }
-    if ((u === userCreds.username.toLowerCase() || u === 'officer' || u === 'viewer') && p === userCreds.password) {
-      return { username: userCreds.username === 'user' ? 'User' : userCreds.username, role: 'user' };
+    if ((u.toLowerCase() === userCreds.username.toLowerCase() || u.toLowerCase() === 'officer' || u.toLowerCase() === 'viewer') && p === userCreds.password) {
+      return { username: userCreds.username === 'user' ? 'User' : userCreds.username, role: 'user', authMethod: 'local' };
     }
     return null;
+  }
+
+  /* ==========================================================================
+     Theme Management System (Light / Dark Mode)
+     ========================================================================== */
+
+  function applyTheme(themeName, save = true) {
+    const validTheme = themeName === 'dark' ? 'dark' : 'light';
+    state.theme = validTheme;
+    document.documentElement.setAttribute('data-theme', validTheme);
+
+    // Update Header theme toggle
+    const hIcon = document.getElementById('headerThemeToggleIcon');
+    const hText = document.getElementById('headerThemeToggleText');
+    if (hIcon) {
+      hIcon.className = validTheme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    }
+    if (hText) {
+      hText.textContent = validTheme === 'dark' ? 'Light' : 'Dark';
+    }
+
+    // Update Portal gate theme toggle
+    const pIcon = document.getElementById('portalThemeToggleIcon');
+    if (pIcon) {
+      pIcon.className = validTheme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    }
+
+    // Update Admin Settings theme cards
+    const cardLight = document.getElementById('themeChoiceLight');
+    const cardDark = document.getElementById('themeChoiceDark');
+    if (cardLight) cardLight.classList.toggle('active', validTheme === 'light');
+    if (cardDark) cardDark.classList.toggle('active', validTheme === 'dark');
+
+    const themeBadge = document.getElementById('themeActiveBadge');
+    if (themeBadge) {
+      if (validTheme === 'dark') {
+        themeBadge.textContent = 'DARK THEME';
+        themeBadge.style.background = '#312e81';
+        themeBadge.style.color = '#c7d2fe';
+      } else {
+        themeBadge.textContent = 'LIGHT THEME';
+        themeBadge.style.background = '#e0e7ff';
+        themeBadge.style.color = '#4338ca';
+      }
+    }
+
+    // Adapt Chart.js theme colors
+    if (typeof Chart !== 'undefined') {
+      const isDark = validTheme === 'dark';
+      Chart.defaults.color = isDark ? '#cbd5e1' : '#475569';
+      Chart.defaults.borderColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+      if (state.charts.daily) {
+        try {
+          renderOverview();
+        } catch { /* ignore if not loaded yet */ }
+      }
+    }
+
+    if (save) {
+      localStorage.setItem(CONFIG.storageKeys.theme, validTheme);
+    }
+  }
+
+  function toggleTheme() {
+    const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme, true);
+    showToast(`Switched to ${nextTheme === 'dark' ? 'Dark' : 'Light'} theme!`, 'info');
+  }
+
+  function updateAuthTabSettingsUI() {
+    updateCredsDisplay();
+    const inlineNewUser = document.getElementById('inlineNewUsername');
+    if (inlineNewUser) inlineNewUser.value = getStoredAdminCreds().username;
+
+    const cardLight = document.getElementById('themeChoiceLight');
+    const cardDark = document.getElementById('themeChoiceDark');
+    if (cardLight) cardLight.classList.toggle('active', state.theme === 'light');
+    if (cardDark) cardDark.classList.toggle('active', state.theme === 'dark');
   }
 
   function handleLoginSuccess(sessionData) {
@@ -1449,12 +1598,25 @@ function doPost(e) {
     updateAdminAuthUI();
 
     showToast(`Access granted: Welcome ${sessionData.username} (${sessionData.role.toUpperCase()})!`, 'success');
+
+    // Show the data after login with username and password
+    fetchLiveSheetData(false);
+    startAutoSync();
+    renderAll();
   }
 
   function handleGlobalLogout() {
     state.isAuthenticated = false;
     state.currentUser = null;
     sessionStorage.removeItem(CONFIG.storageKeys.adminSession);
+
+    if (state.autoSyncTimer) {
+      clearInterval(state.autoSyncTimer);
+      state.autoSyncTimer = null;
+    }
+
+    // Clear colonies data from memory and display
+    state.allColonies = [];
 
     const gate = document.getElementById('globalAuthGate');
     const app = document.getElementById('dashboardApp');
@@ -1463,14 +1625,17 @@ function doPost(e) {
       const uInput = document.getElementById('portalUsername');
       const pInput = document.getElementById('portalPassword');
       const errBox = document.getElementById('portalLoginErrorMsg');
-      if (uInput) uInput.value = 'admin';
+      if (uInput) uInput.value = '';
       if (pInput) pInput.value = '';
       if (errBox) errBox.style.display = 'none';
     }
     if (app) app.style.display = 'none';
 
+    updateCredsDisplay();
     updateHeaderAuthUI();
     updateAdminAuthUI();
+    renderAll();
+
     showToast('Logged out of dashboard. Website locked.', 'info');
   }
 
@@ -1490,7 +1655,7 @@ function doPost(e) {
           if (app) app.style.display = 'block';
           updateHeaderAuthUI();
           updateAdminAuthUI();
-          return;
+          return true;
         }
       } catch { /* parse fail */ }
     }
@@ -1500,8 +1665,10 @@ function doPost(e) {
     state.currentUser = null;
     if (gate) gate.style.display = 'flex';
     if (app) app.style.display = 'none';
+    updateCredsDisplay();
     updateHeaderAuthUI();
     updateAdminAuthUI();
+    return false;
   }
 
   function updateHeaderAuthUI() {
@@ -1538,14 +1705,24 @@ function doPost(e) {
       loginView.style.display = 'none';
       loggedInView.style.display = 'block';
       const nameEl = document.getElementById('adminDisplayName');
-      if (nameEl) nameEl.textContent = state.adminUser || 'Admin';
+      if (nameEl) nameEl.textContent = state.adminUser || state.currentUser.username || 'Admin';
+
+      const subEl = document.getElementById('adminDisplayRoleSub');
+      if (subEl) {
+        subEl.textContent = 'ADMINISTRATOR • EXCEL LIVE LINKED';
+      }
+
       const scriptInput = document.getElementById('appsScriptUrlInput');
       if (scriptInput) scriptInput.value = state.scriptUrl;
+
       updateSyncStatusUI();
+      updateCredsDisplay();
+      updateAuthTabSettingsUI();
       renderAdminTable();
     } else {
       loginView.style.display = 'flex';
       loggedInView.style.display = 'none';
+      updateCredsDisplay();
     }
   }
 
@@ -1904,8 +2081,13 @@ function doPost(e) {
     document.querySelectorAll('.admin-subtab').forEach((btn) => {
       btn.classList.toggle('active', btn.getAttribute('data-admintab') === tabName);
     });
-    document.getElementById('adminSubColonies').style.display = tabName === 'colonies' ? 'block' : 'none';
-    document.getElementById('adminSubSync').style.display = tabName === 'sync' ? 'block' : 'none';
+    const subColonies = document.getElementById('adminSubColonies');
+    const subSync = document.getElementById('adminSubSync');
+    const subAuth = document.getElementById('adminSubAuth');
+    if (subColonies) subColonies.style.display = tabName === 'colonies' ? 'block' : 'none';
+    if (subSync) subSync.style.display = tabName === 'sync' ? 'block' : 'none';
+    if (subAuth) subAuth.style.display = tabName === 'auth' ? 'block' : 'none';
+    if (tabName === 'auth') updateAuthTabSettingsUI();
   }
 
   function exportCSV() {
@@ -1993,12 +2175,11 @@ function doPost(e) {
         localStorage.removeItem(CONFIG.storageKeys.pendingEdits);
         localStorage.removeItem(CONFIG.storageKeys.deletedRows);
         state.pendingEdits = {};
-        if (window.GHMC_INITIAL_DATA && Array.isArray(window.GHMC_INITIAL_DATA.colonies)) {
-          state.allColonies = JSON.parse(JSON.stringify(window.GHMC_INITIAL_DATA.colonies));
-        }
-        showToast('Reset to original Google Sheet dataset completed.', 'info');
+        state.allColonies = [];
+        showToast('Resetting workspace and re-fetching live sheet data...', 'info');
         updateSyncStatusUI();
         renderAll();
+        fetchLiveSheetData(false);
       });
     }
     document.getElementById('btnExportCsv').addEventListener('click', exportCSV);
@@ -2090,26 +2271,27 @@ function doPost(e) {
     // Global Portal Login Form
     const portalForm = document.getElementById('portalLoginForm');
     if (portalForm) {
-      portalForm.addEventListener('submit', (e) => {
+      portalForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const u = document.getElementById('portalUsername').value;
         const p = document.getElementById('portalPassword').value;
         const errBox = document.getElementById('portalLoginErrorMsg');
         const submitBtn = document.getElementById('portalSubmitBtn');
 
-        const auth = authenticateCredentials(u, p);
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>Verifying &amp; Loading...</span> <i class="fa-solid fa-spinner fa-spin"></i>';
+
+        const auth = await authenticateCredentials(u, p);
         if (auth) {
           if (errBox) errBox.style.display = 'none';
-          submitBtn.disabled = true;
-          submitBtn.innerHTML = '<span>Verifying &amp; Loading...</span> <i class="fa-solid fa-spinner fa-spin"></i>';
-          setTimeout(() => {
-            handleLoginSuccess(auth);
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<span>Sign In to Dashboard</span> <i class="fa-solid fa-arrow-right"></i>';
-          }, 250);
+          handleLoginSuccess(auth);
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<span>Sign In to Dashboard</span> <i class="fa-solid fa-arrow-right"></i>';
         } else {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<span>Sign In to Dashboard</span> <i class="fa-solid fa-arrow-right"></i>';
           if (errBox) {
-            errBox.textContent = 'Invalid username or password. Check default Admin (admin / admin123) or User (user / user123) credentials.';
+            errBox.textContent = 'Invalid username or password. Please check your credentials and try again.';
             errBox.style.display = 'block';
           }
         }
@@ -2132,7 +2314,7 @@ function doPost(e) {
       });
     }
 
-    // Portal Role Tabs & Chips
+    // Portal Role Tabs
     const tabAdmin = document.getElementById('tabRoleAdmin');
     const tabUser = document.getElementById('tabRoleUser');
     const roleBadge = document.getElementById('portalRoleBadge');
@@ -2148,7 +2330,7 @@ function doPost(e) {
           roleBadge.className = 'portal-badge-pill';
           roleBadgeText.textContent = 'ADMINISTRATOR ACCESS • FULL MANAGEMENT & EXCEL SYNC';
         }
-        if (portalUserField) portalUserField.value = 'admin';
+        if (portalUserField) portalUserField.value = '';
         if (portalPassField) {
           portalPassField.value = '';
           portalPassField.focus();
@@ -2162,30 +2344,11 @@ function doPost(e) {
           roleBadge.className = 'portal-badge-pill user-mode';
           roleBadgeText.textContent = 'USER ACCESS • ANALYTICS & COLONY VIEWER';
         }
-        if (portalUserField) portalUserField.value = 'user';
+        if (portalUserField) portalUserField.value = '';
         if (portalPassField) {
           portalPassField.value = '';
           portalPassField.focus();
         }
-      });
-    }
-
-    const chipAdmin = document.getElementById('chipAdminLogin');
-    const chipUser = document.getElementById('chipUserLogin');
-    if (chipAdmin) {
-      chipAdmin.addEventListener('click', () => {
-        if (tabAdmin) tabAdmin.click();
-        const creds = getStoredAdminCreds();
-        if (portalUserField) portalUserField.value = creds.username;
-        if (portalPassField) portalPassField.value = creds.password;
-      });
-    }
-    if (chipUser) {
-      chipUser.addEventListener('click', () => {
-        if (tabUser) tabUser.click();
-        const creds = getStoredUserCreds();
-        if (portalUserField) portalUserField.value = creds.username;
-        if (portalPassField) portalPassField.value = creds.password;
       });
     }
 
@@ -2196,26 +2359,28 @@ function doPost(e) {
     }
 
     // Admin Login Form (Image 3 in View-Admin)
-    document.getElementById('adminLoginForm').addEventListener('submit', (e) => {
+    document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const user = document.getElementById('loginUsername').value.trim();
       const pass = document.getElementById('loginPassword').value;
       const errBox = document.getElementById('loginErrorMsg');
       const submitBtn = document.getElementById('loginSubmitBtn');
-      const auth = authenticateCredentials(user, pass);
+
+      submitBtn.textContent = 'Signing in...';
+      submitBtn.disabled = true;
+
+      const auth = await authenticateCredentials(user, pass);
 
       if (auth && auth.role === 'admin') {
         errBox.style.display = 'none';
-        submitBtn.textContent = 'Signing in...';
-        submitBtn.disabled = true;
-        setTimeout(() => {
-          handleLoginSuccess(auth);
-          submitBtn.textContent = 'Sign In';
-          submitBtn.disabled = false;
-          document.getElementById('loginPassword').value = '';
-        }, 250);
+        handleLoginSuccess(auth);
+        submitBtn.textContent = 'Sign In';
+        submitBtn.disabled = false;
+        document.getElementById('loginPassword').value = '';
       } else {
-        errBox.textContent = 'Invalid Admin credentials. Default: admin / admin123';
+        submitBtn.textContent = 'Sign In';
+        submitBtn.disabled = false;
+        errBox.textContent = 'Invalid Admin credentials. Please check your credentials and try again.';
         errBox.style.display = 'block';
       }
     });
@@ -2387,30 +2552,143 @@ function doPost(e) {
       renderAll();
     });
 
-    document.getElementById('btnOpenChangePwd').addEventListener('click', () => {
-      document.getElementById('changePwdModal').classList.add('open');
-    });
+    // Update Admin Credentials Modal
+    const btnOpenChangePwd = document.getElementById('btnOpenChangePwd');
+    if (btnOpenChangePwd) {
+      btnOpenChangePwd.addEventListener('click', () => {
+        const creds = getStoredAdminCreds();
+        const uInput = document.getElementById('newAdminUsername');
+        if (uInput) uInput.value = creds.username;
+        const curPwd = document.getElementById('curPwd');
+        if (curPwd) curPwd.value = '';
+        const newPwd = document.getElementById('newPwd');
+        if (newPwd) newPwd.value = '';
+        const confirmPwd = document.getElementById('confirmPwd');
+        if (confirmPwd) confirmPwd.value = '';
+        updateCredsDisplay();
+        document.getElementById('changePwdModal').classList.add('open');
+      });
+    }
 
-    document.getElementById('changePwdForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const cur = document.getElementById('curPwd').value;
-      const np = document.getElementById('newPwd').value;
-      const cp = document.getElementById('confirmPwd').value;
-      const creds = getStoredAdminCreds();
+    const changePwdForm = document.getElementById('changePwdForm');
+    if (changePwdForm) {
+      changePwdForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const cur = document.getElementById('curPwd').value;
+        const nu = document.getElementById('newAdminUsername').value.trim();
+        const np = document.getElementById('newPwd').value;
+        const cp = document.getElementById('confirmPwd').value;
+        const creds = getStoredAdminCreds();
 
-      if (cur !== creds.password) {
-        showToast('Current password is incorrect.', 'error');
-        return;
-      }
-      if (np !== cp) {
-        showToast('New passwords do not match.', 'error');
-        return;
-      }
-      localStorage.setItem(CONFIG.storageKeys.adminCreds, JSON.stringify({ username: creds.username, password: np }));
-      document.getElementById('changePwdForm').reset();
-      document.getElementById('changePwdModal').classList.remove('open');
-      showToast('Admin password updated successfully!', 'success');
-    });
+        if (cur !== creds.password) {
+          showToast('Current password is incorrect.', 'error');
+          return;
+        }
+        if (!nu || nu.length < 3) {
+          showToast('Admin username must be at least 3 characters.', 'error');
+          return;
+        }
+        if (np) {
+          if (np.length < 4) {
+            showToast('New password must be at least 4 characters.', 'error');
+            return;
+          }
+          if (np !== cp) {
+            showToast('New passwords do not match.', 'error');
+            return;
+          }
+        }
+
+        const ok = saveAdminCredentials(nu, np);
+        if (ok) {
+          document.getElementById('changePwdForm').reset();
+          document.getElementById('changePwdModal').classList.remove('open');
+          showToast(`Admin account updated: Username is now '${nu}'!`, 'success');
+        }
+      });
+    }
+
+    // Inline Admin Credentials Form (Admin & Auth Sub-Tab)
+    const inlineAdminForm = document.getElementById('inlineAdminCredsForm');
+    if (inlineAdminForm) {
+      inlineAdminForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const cur = document.getElementById('inlineCurPwd').value;
+        const nu = document.getElementById('inlineNewUsername').value.trim();
+        const np = document.getElementById('inlineNewPwd').value;
+        const cp = document.getElementById('inlineConfirmPwd').value;
+        const creds = getStoredAdminCreds();
+
+        if (cur !== creds.password) {
+          showToast('Current password verification failed.', 'error');
+          return;
+        }
+        if (!nu || nu.length < 3) {
+          showToast('Admin username must be at least 3 characters.', 'error');
+          return;
+        }
+        if (np) {
+          if (np.length < 4) {
+            showToast('New password must be at least 4 characters.', 'error');
+            return;
+          }
+          if (np !== cp) {
+            showToast('New passwords do not match.', 'error');
+            return;
+          }
+        }
+
+        const ok = saveAdminCredentials(nu, np);
+        if (ok) {
+          document.getElementById('inlineCurPwd').value = '';
+          document.getElementById('inlineNewPwd').value = '';
+          document.getElementById('inlineConfirmPwd').value = '';
+          showToast(`Admin account updated successfully (Username: '${nu}')!`, 'success');
+        }
+      });
+    }
+
+    const btnResetDefaultCreds = document.getElementById('btnResetDefaultCreds');
+    if (btnResetDefaultCreds) {
+      btnResetDefaultCreds.addEventListener('click', () => {
+        if (confirm('Reset Administrator credentials back to default (admin / admin123)?')) {
+          saveAdminCredentials('admin', 'admin123');
+          showToast('Admin credentials reset to defaults (admin / admin123).', 'info');
+        }
+      });
+    }
+
+    // Theme Switcher Event Listeners
+    const headerThemeBtn = document.getElementById('headerThemeToggleBtn');
+    if (headerThemeBtn) {
+      headerThemeBtn.addEventListener('click', toggleTheme);
+    }
+
+    const portalThemeBtn = document.getElementById('portalThemeToggleBtn');
+    if (portalThemeBtn) {
+      portalThemeBtn.addEventListener('click', toggleTheme);
+    }
+
+    const btnApplyThemeToggle = document.getElementById('btnApplyThemeToggle');
+    if (btnApplyThemeToggle) {
+      btnApplyThemeToggle.addEventListener('click', toggleTheme);
+    }
+
+    const themeChoiceLight = document.getElementById('themeChoiceLight');
+    if (themeChoiceLight) {
+      themeChoiceLight.addEventListener('click', () => {
+        applyTheme('light', true);
+        showToast('Switched to Light Theme (Corporate Day)', 'info');
+      });
+    }
+
+    const themeChoiceDark = document.getElementById('themeChoiceDark');
+    if (themeChoiceDark) {
+      themeChoiceDark.addEventListener('click', () => {
+        applyTheme('dark', true);
+        showToast('Switched to Dark Theme (Executive GIS Night)', 'info');
+      });
+    }
 
     // Global Event Delegation for Edit Colony buttons (Date Wise, Circle Drilldown, Admin Table)
     document.addEventListener('click', (e) => {
@@ -2441,24 +2719,28 @@ function doPost(e) {
   function init() {
     document.getElementById('appsScriptPreview').textContent = APPS_SCRIPT_SNIPPET;
 
-    // 1. Try loading persistent workspace data first (preserves user edits and local modifications)
-    const saved = loadWorkspaceData();
-    if (saved && Array.isArray(saved) && saved.length > 0) {
-      state.allColonies = mergePendingEdits(saved);
-      state.lastSyncedAt = new Date();
-    } else if (window.GHMC_INITIAL_DATA && Array.isArray(window.GHMC_INITIAL_DATA.colonies)) {
-      state.allColonies = mergePendingEdits(window.GHMC_INITIAL_DATA.colonies);
-      state.lastSyncedAt = new Date();
-    }
-
-    restoreAdminSession();
+    const hasSession = restoreAdminSession();
     setupEvents();
-    updateSyncStatusUI();
-    renderAll();
+    updateCredsDisplay();
+    applyTheme(state.theme, false);
 
-    // Pull live updates from Google Sheet non-destructively
-    fetchLiveSheetData(true);
-    startAutoSync();
+    if (hasSession && state.isAuthenticated) {
+      // User is already logged in (active session in sessionStorage)
+      const saved = loadWorkspaceData();
+      if (saved && Array.isArray(saved) && saved.length > 0) {
+        state.allColonies = mergePendingEdits(saved);
+        state.lastSyncedAt = new Date();
+      }
+      updateSyncStatusUI();
+      renderAll();
+      fetchLiveSheetData(true);
+      startAutoSync();
+    } else {
+      // Unauthenticated: Website is locked behind login gate; no pre-data loaded, no sync running
+      state.allColonies = [];
+      updateSyncStatusUI();
+      renderAll();
+    }
   }
 
   document.addEventListener('DOMContentLoaded', init);
