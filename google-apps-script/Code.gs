@@ -282,6 +282,22 @@ function doPost(e) {
       });
     }
 
+    if (action === 'deleteRow') {
+      var rowNum = parseInt(body.row || (body.data && body.data.row), 10);
+      if (!isNaN(rowNum) && rowNum >= 2 && rowNum <= sheet.getLastRow()) {
+        sheet.deleteRow(rowNum);
+        SpreadsheetApp.flush();
+        return jsonOutput({
+          ok: true,
+          action: 'deleteRow',
+          row: rowNum,
+          message: 'Row #' + rowNum + ' deleted from Google Sheet (' + SHEET_NAME + ').',
+          updatedAt: new Date().toISOString()
+        });
+      }
+      return jsonOutput({ ok: false, error: 'Invalid row to delete: ' + body.row });
+    }
+
     return jsonOutput({ ok: false, error: 'Unsupported action: ' + action });
   } catch (err) {
     return jsonOutput({ ok: false, error: err.message });

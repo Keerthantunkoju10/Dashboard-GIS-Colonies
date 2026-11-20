@@ -211,6 +211,15 @@ function doPost(e) {
       SpreadsheetApp.flush();
       return jsonOut({ ok: true, count: items.length, message: items.length + ' rows synced to Google Sheet.' });
     }
+    if (body.action === 'deleteRow') {
+      var rNum = parseInt(body.row || (body.data && body.data.row), 10);
+      if (!isNaN(rNum) && rNum >= 2 && rNum <= sheet.getLastRow()) {
+        sheet.deleteRow(rNum);
+        SpreadsheetApp.flush();
+        return jsonOut({ ok: true, row: rNum, message: 'Deleted Row #' + rNum });
+      }
+      return jsonOut({ ok: false, error: 'Invalid row to delete' });
+    }
     return jsonOut({ ok: false, error: 'Unknown action' });
   } catch (err) {
     return jsonOut({ ok: false, error: err.message });
@@ -1081,7 +1090,7 @@ function doPost(e) {
     `;
 
     document.getElementById('dateTableBody').innerHTML = filtered.map((r) => `
-      <tr>
+      <tr data-row="${escapeHtml(r.row)}">
         <td>${escapeHtml(r.sno)}</td>
         <td>${escapeHtml(formatDisplayDate(r.date))}</td>
         <td><strong>${escapeHtml(r.circle)}</strong></td>
@@ -1091,8 +1100,13 @@ function doPost(e) {
         <td class="num">${formatIndianNumber(r.dashboardCount)}</td>
         <td class="num"><strong>${formatIndianNumber(r.finalCount)}</strong></td>
         <td>${escapeHtml(r.reason || '—')}</td>
+        <td class="center">
+          <button type="button" class="action-btn-pill edit-btn js-open-edit" data-row="${escapeHtml(r.row)}" title="Edit Colony Details">
+            <i class="fa-solid fa-pen-to-square"></i> Edit
+          </button>
+        </td>
       </tr>
-    `).join('') || `<tr><td colspan="9" class="center">No colony records for selected date</td></tr>`;
+    `).join('') || `<tr><td colspan="10" class="center">No colony records for selected date</td></tr>`;
   }
 
   /* ==========================================================================
@@ -1157,7 +1171,7 @@ function doPost(e) {
     panel.style.display = 'block';
     document.getElementById('circleDrilldownTitle').textContent = `${found.circle} — ${found.rows.length} Colony Records`;
     document.getElementById('circleDrilldownBody').innerHTML = found.rows.map((r) => `
-      <tr>
+      <tr data-row="${escapeHtml(r.row)}">
         <td>${escapeHtml(r.sno)}</td>
         <td>${escapeHtml(r.ward)}</td>
         <td><strong>${escapeHtml(r.colony)}</strong></td>
@@ -1166,8 +1180,13 @@ function doPost(e) {
         <td class="num">${formatIndianNumber(r.dashboardCount)}</td>
         <td class="num"><strong>${formatIndianNumber(r.finalCount)}</strong></td>
         <td>${escapeHtml(r.reason || '—')}</td>
+        <td class="center">
+          <button type="button" class="action-btn-pill edit-btn js-open-edit" data-row="${escapeHtml(r.row)}" title="Edit Colony Details">
+            <i class="fa-solid fa-pen-to-square"></i> Edit
+          </button>
+        </td>
       </tr>
-    `).join('');
+    `).join('') || `<tr><td colspan="9" class="center">No colonies for this circle</td></tr>`;
   }
 
   /* ==========================================================================
@@ -1389,7 +1408,7 @@ function doPost(e) {
           <td><strong>${escapeHtml(r.sno || r.row)}</strong>${pendingTag}</td>
           <td>${escapeHtml(r.circle)}</td>
           <td>${escapeHtml(r.ward)}</td>
-          <td><strong>${escapeHtml(r.colony)}</strong></td>
+          <td><strong><a href="javascript:void(0)" class="js-open-edit" data-row="${escapeHtml(r.row)}" style="color:var(--text-dark);text-decoration:underline;text-underline-offset:2px;" title="Click to edit full colony details">${escapeHtml(r.colony)} <i class="fa-solid fa-pen" style="font-size:10px;color:#3b82f6;opacity:0.8;margin-left:2px;"></i></a></strong></td>
           <td class="num">
             <input type="number" class="inline-num-input js-dash" value="${Number(r.dashboardCount) || 0}" min="0" aria-label="Dashboard Count" />
           </td>
@@ -1411,7 +1430,12 @@ function doPost(e) {
             <input type="text" class="inline-text-input js-reason" value="${escapeHtml(r.reason || '')}" placeholder="Reason / remarks" aria-label="Reason" />
           </td>
           <td class="center">
-            <button type="button" class="row-save-btn js-save-row">Save</button>
+            <div class="action-btn-group">
+              <button type="button" class="row-save-btn js-save-row" title="Quick Save Row Changes">Save</button>
+              <button type="button" class="action-btn-pill edit-btn js-open-edit" data-row="${escapeHtml(r.row)}" title="Edit Full Colony Details">
+                <i class="fa-solid fa-pen-to-square"></i> Edit
+              </button>
+            </div>
           </td>
         </tr>
       `;
@@ -1474,6 +1498,138 @@ function doPost(e) {
     btn.disabled = false;
     btn.textContent = 'Save';
 
+    updateSyncStatusUI();
+    renderAll();
+  }
+
+  function openEditColonyModal(rowId) {
+    if (!state.isAuthenticated) {
+      showToast('Please sign in to edit colony details.', 'warn');
+      const gate = document.getElementById('globalAuthGate');
+      if (gate) gate.style.display = 'flex';
+      return;
+    }
+
+    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+    if (!isAdmin) {
+      showToast('Administrator privileges required to edit colony details.', 'warn');
+      switchView('admin');
+      return;
+    }
+
+    const record = state.allColonies.find((r) => String(r.row) === String(rowId));
+    if (!record) {
+      showToast('Colony record not found.', 'error');
+      return;
+    }
+
+    document.getElementById('editRowId').value = record.row;
+    document.getElementById('editSno').value = record.sno || '';
+    document.getElementById('editDate').value = record.date || '';
+    document.getElementById('editCircle').value = record.circle || '';
+    document.getElementById('editWard').value = record.ward || '';
+    document.getElementById('editColonyName').value = record.colony || '';
+    document.getElementById('editStatus').value = ['COMPLETED', 'PROGRESS', 'HOLD', 'REJECTED'].includes((record.status || '').toUpperCase()) ? record.status.toUpperCase() : 'HOLD';
+    document.getElementById('editDashboardCount').value = record.dashboardCount || 0;
+    document.getElementById('editFinalCount').value = record.finalCount || 0;
+    document.getElementById('editReason').value = record.reason || '';
+
+    const subTitle = document.getElementById('editColonySubTitle');
+    if (subTitle) {
+      subTitle.textContent = `Google Sheet Row #${record.row} • SNO: ${record.sno || '-'} • COLONIES`;
+    }
+
+    const modal = document.getElementById('editColonyModal');
+    if (modal) modal.classList.add('open');
+  }
+
+  async function handleSaveEditedColony(e) {
+    e.preventDefault();
+    const rowId = document.getElementById('editRowId').value;
+    const record = state.allColonies.find((r) => String(r.row) === String(rowId));
+    if (!record) {
+      showToast('Colony record not found.', 'error');
+      return;
+    }
+
+    const saveBtn = document.getElementById('btnSaveEditedColony');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+    const newDash = parseNumeric(document.getElementById('editDashboardCount').value);
+    const newFinal = parseNumeric(document.getElementById('editFinalCount').value);
+    const newSno = document.getElementById('editSno').value.trim() || record.sno;
+    const newDate = document.getElementById('editDate').value;
+    const newCircle = document.getElementById('editCircle').value.trim().toUpperCase();
+    const newWard = document.getElementById('editWard').value.trim().toUpperCase();
+    const newColony = document.getElementById('editColonyName').value.trim().toUpperCase();
+    const newStatus = document.getElementById('editStatus').value.toUpperCase();
+    const newReason = document.getElementById('editReason').value.trim();
+
+    const updatedFields = {
+      row: record.row,
+      sno: newSno,
+      circle: newCircle,
+      ward: newWard,
+      colony: newColony,
+      date: newDate,
+      status: newStatus,
+      dashboardCount: newDash,
+      finalCount: newFinal,
+      dashboardRaw: String(newDash),
+      finalRaw: String(newFinal),
+      reason: newReason
+    };
+
+    Object.assign(record, updatedFields);
+
+    const result = await writeToGoogleSheet('updateRow', { data: updatedFields });
+
+    if (result && result.ok) {
+      delete record._pendingSync;
+      delete state.pendingEdits[String(record.row)];
+      savePendingEdits();
+      showToast(`Colony "${record.colony}" updated in Google Sheet & Dashboard!`, 'success');
+    } else {
+      record._pendingSync = true;
+      state.pendingEdits[String(record.row)] = updatedFields;
+      savePendingEdits();
+      showToast(`Colony "${record.colony}" updated in Dashboard! Connect Apps Script to push to Google Sheet.`, 'warn');
+    }
+
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Save Colony Details';
+
+    const modal = document.getElementById('editColonyModal');
+    if (modal) modal.classList.remove('open');
+
+    updateSyncStatusUI();
+    renderAll();
+  }
+
+  async function handleDeleteColony(rowId) {
+    if (!state.isAuthenticated) {
+      showToast('Please sign in as Admin to delete colonies.', 'warn');
+      return;
+    }
+
+    const record = state.allColonies.find((r) => String(r.row) === String(rowId));
+    if (!record) return;
+
+    if (!confirm(`Are you sure you want to delete colony "${record.colony}" (Row #${record.row})?`)) {
+      return;
+    }
+
+    state.allColonies = state.allColonies.filter((r) => String(r.row) !== String(rowId));
+    delete state.pendingEdits[String(rowId)];
+    savePendingEdits();
+
+    await writeToGoogleSheet('deleteRow', { row: record.row });
+
+    const modal = document.getElementById('editColonyModal');
+    if (modal) modal.classList.remove('open');
+
+    showToast(`Colony "${record.colony}" removed from Dashboard.`, 'info');
     updateSyncStatusUI();
     renderAll();
   }
@@ -1970,6 +2126,31 @@ function doPost(e) {
       document.getElementById('changePwdModal').classList.remove('open');
       showToast('Admin password updated successfully!', 'success');
     });
+
+    // Global Event Delegation for Edit Colony buttons (Date Wise, Circle Drilldown, Admin Table)
+    document.addEventListener('click', (e) => {
+      const editBtn = e.target.closest('.js-open-edit');
+      if (editBtn) {
+        e.preventDefault();
+        const rowId = editBtn.getAttribute('data-row');
+        if (rowId) openEditColonyModal(rowId);
+      }
+    });
+
+    // Edit Colony Form Submit
+    const editColonyForm = document.getElementById('editColonyForm');
+    if (editColonyForm) {
+      editColonyForm.addEventListener('submit', handleSaveEditedColony);
+    }
+
+    // Delete Colony Button in Modal
+    const btnDelColony = document.getElementById('btnDeleteColony');
+    if (btnDelColony) {
+      btnDelColony.addEventListener('click', () => {
+        const rowId = document.getElementById('editRowId').value;
+        if (rowId) handleDeleteColony(rowId);
+      });
+    }
   }
 
   function init() {

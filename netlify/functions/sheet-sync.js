@@ -226,6 +226,7 @@ exports.handler = async function (event) {
 
       const forwardBody = {
         action: payload.action || 'updateRow',
+        row: payload.row,
         data: payload.data,
         items: payload.items
       };

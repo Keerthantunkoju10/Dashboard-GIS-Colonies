@@ -520,6 +520,7 @@
                 <th class="num">Dashboard Count</th>
                 <th class="num">Finalized Count</th>
                 <th>Reason / Remarks</th>
+                <th class="center">Action</th>
               </tr>
             </thead>
             <tbody id="dateTableBody"></tbody>
@@ -579,6 +580,7 @@
                   <th class="num">Dashboard</th>
                   <th class="num">Finalized</th>
                   <th>Reason</th>
+                  <th class="center">Action</th>
                 </tr>
               </thead>
               <tbody id="circleDrilldownBody"></tbody>
@@ -877,6 +879,81 @@
         <div class="modal-footer">
           <button type="button" class="tool-btn" data-close-modal="addColonyModal">Cancel</button>
           <button type="submit" class="tool-btn teal" id="btnSubmitNewColony">Save to Excel &amp; Dashboard</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Colony Details Modal -->
+  <div class="modal-backdrop" id="editColonyModal">
+    <div class="modal-dialog" style="max-width: 620px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="modal-icon-badge" style="background:#eff6ff;color:#2563eb;width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;"><i class="fa-solid fa-pen-to-square"></i></div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px;">Edit Colony Details</h3>
+            <span style="font-size: 11px; color: var(--text-muted);" id="editColonySubTitle">Google Sheet Row # &bull; COLONIES</span>
+          </div>
+        </div>
+        <button class="modal-close" data-close-modal="editColonyModal">&times;</button>
+      </div>
+      <form id="editColonyForm">
+        <input type="hidden" id="editRowId" />
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="editSno">SNO / Serial Number</label>
+              <input type="text" id="editSno" class="control-input" placeholder="e.g. 1" />
+            </div>
+            <div class="form-group">
+              <label for="editDate">Alloted Date *</label>
+              <input type="date" id="editDate" class="control-input" required />
+            </div>
+            <div class="form-group">
+              <label for="editCircle">Circle *</label>
+              <input type="text" id="editCircle" class="control-input" list="circlesDatalist" required placeholder="e.g. 24-KUKATPALLY" />
+            </div>
+            <div class="form-group">
+              <label for="editWard">Ward *</label>
+              <input type="text" id="editWard" class="control-input" required placeholder="e.g. 123-HYDER NAGAR" />
+            </div>
+            <div class="form-group full">
+              <label for="editColonyName">Colony Name *</label>
+              <input type="text" id="editColonyName" class="control-input" required placeholder="Enter Colony Name" style="font-weight: 600;" />
+            </div>
+            <div class="form-group">
+              <label for="editStatus">Colony Status *</label>
+              <select id="editStatus" class="control-select">
+                <option value="COMPLETED">COMPLETED</option>
+                <option value="PROGRESS">PROGRESS</option>
+                <option value="HOLD">HOLD</option>
+                <option value="REJECTED">REJECTED</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="editDashboardCount">Dashboard Count (Properties)</label>
+              <input type="number" id="editDashboardCount" class="control-input" min="0" placeholder="0" />
+            </div>
+            <div class="form-group">
+              <label for="editFinalCount">Finalized Count (Properties)</label>
+              <input type="number" id="editFinalCount" class="control-input" min="0" placeholder="0" />
+            </div>
+            <div class="form-group full">
+              <label for="editReason">Reason / Remarks</label>
+              <input type="text" id="editReason" class="control-input" placeholder="e.g. COMPLETED / Field Work / Remarks" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <button type="button" class="tool-btn danger-outline" id="btnDeleteColony" title="Delete Colony Record">
+            <i class="fa-solid fa-trash"></i> Delete Colony
+          </button>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="tool-btn" data-close-modal="editColonyModal">Cancel</button>
+            <button type="submit" class="tool-btn teal" id="btnSaveEditedColony">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Save Colony Details
+            </button>
+          </div>
         </div>
       </form>
     </div>
