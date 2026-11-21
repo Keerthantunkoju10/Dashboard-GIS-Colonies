@@ -784,9 +784,10 @@ function doPost(e) {
     renderDateWise();
     renderCircleWise();
     renderColoniesDirectory();
-    if (state.isAuthenticated) {
+    if (isCurrentUserAdmin()) {
       renderAdminTable();
     }
+    applyRoleBasedUI();
   }
 
   function renderPrimaryTabCounts() {
@@ -1209,6 +1210,10 @@ function doPost(e) {
       <div class="admin-stat-box mint"><div class="as-label">Finalized Count</div><div class="as-val">${formatIndianNumber(totalFinal)}</div></div>
     `;
 
+    const isAdmin = isCurrentUserAdmin();
+    const actionTh = document.getElementById('dateTableActionTh');
+    if (actionTh) actionTh.style.display = isAdmin ? '' : 'none';
+
     document.getElementById('dateTableBody').innerHTML = filtered.map((r) => `
       <tr data-row="${escapeHtml(r.row)}">
         <td>${escapeHtml(r.sno)}</td>
@@ -1220,13 +1225,14 @@ function doPost(e) {
         <td class="num">${formatIndianNumber(r.dashboardCount)}</td>
         <td class="num"><strong>${formatIndianNumber(r.finalCount)}</strong></td>
         <td>${escapeHtml(r.reason || '—')}</td>
+        ${isAdmin ? `
         <td class="center">
           <button type="button" class="action-btn-pill edit-btn js-open-edit" data-row="${escapeHtml(r.row)}" title="Edit Colony Details">
             <i class="fa-solid fa-pen-to-square"></i> Edit
           </button>
-        </td>
+        </td>` : ''}
       </tr>
-    `).join('') || `<tr><td colspan="10" class="center">No colony records for selected date</td></tr>`;
+    `).join('') || `<tr><td colspan="${isAdmin ? 10 : 9}" class="center">No colony records for selected date</td></tr>`;
   }
 
   /* ==========================================================================
@@ -1289,6 +1295,10 @@ function doPost(e) {
       return;
     }
     panel.style.display = 'block';
+    const isAdmin = isCurrentUserAdmin();
+    const actionTh = document.getElementById('circleDrilldownActionTh');
+    if (actionTh) actionTh.style.display = isAdmin ? '' : 'none';
+
     document.getElementById('circleDrilldownTitle').textContent = `${found.circle} — ${found.rows.length} Colony Records`;
     document.getElementById('circleDrilldownBody').innerHTML = found.rows.map((r) => `
       <tr data-row="${escapeHtml(r.row)}">
@@ -1300,13 +1310,14 @@ function doPost(e) {
         <td class="num">${formatIndianNumber(r.dashboardCount)}</td>
         <td class="num"><strong>${formatIndianNumber(r.finalCount)}</strong></td>
         <td>${escapeHtml(r.reason || '—')}</td>
+        ${isAdmin ? `
         <td class="center">
           <button type="button" class="action-btn-pill edit-btn js-open-edit" data-row="${escapeHtml(r.row)}" title="Edit Colony Details">
             <i class="fa-solid fa-pen-to-square"></i> Edit
           </button>
-        </td>
+        </td>` : ''}
       </tr>
-    `).join('') || `<tr><td colspan="9" class="center">No colonies for this circle</td></tr>`;
+    `).join('') || `<tr><td colspan="${isAdmin ? 9 : 8}" class="center">No colonies for this circle</td></tr>`;
   }
 
   /* ==========================================================================
@@ -1357,8 +1368,15 @@ function doPost(e) {
       countBadge.textContent = `Showing ${filtered.length} of ${all.length} colonies`;
     }
 
+    const isAdmin = isCurrentUserAdmin();
+    const actionTh = document.getElementById('coloniesDirActionTh');
+    if (actionTh) actionTh.style.display = isAdmin ? '' : 'none';
+
+    const btnAddFromDir = document.getElementById('btnAddNewColonyFromDirectory');
+    if (btnAddFromDir) btnAddFromDir.style.display = isAdmin ? '' : 'none';
+
     if (filtered.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:var(--text-muted); font-size:13px;">No colonies found matching your search / filter criteria.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="${isAdmin ? 10 : 9}" style="text-align:center; padding:30px; color:var(--text-muted); font-size:13px;">No colonies found matching your search / filter criteria.</td></tr>`;
       return;
     }
 
@@ -1372,10 +1390,11 @@ function doPost(e) {
           <td><strong>${escapeHtml(r.circle || '-')}</strong></td>
           <td>${escapeHtml(r.ward || '-')}</td>
           <td>
+            ${isAdmin ? `
             <a href="javascript:void(0)" class="js-open-edit" data-row="${escapeHtml(r.row)}" style="font-weight:700; color:var(--text-dark); text-decoration:none;" title="Click to edit full colony details">
               ${escapeHtml(r.colony || '-')}
               <i class="fa-solid fa-pen" style="font-size:10px; color:#3b82f6; opacity:0.8; margin-left:4px;"></i>
-            </a>
+            </a>` : `<strong>${escapeHtml(r.colony || '-')}</strong>`}
           </td>
           <td>${escapeHtml(formatDisplayDate(r.date) || '-')}</td>
           <td class="center">
@@ -1386,11 +1405,12 @@ function doPost(e) {
           <td style="max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(r.reason || '')}">
             ${escapeHtml(r.reason || '—')}
           </td>
+          ${isAdmin ? `
           <td class="center">
             <button type="button" class="action-btn-pill edit-btn js-open-edit" data-row="${escapeHtml(r.row)}" title="Edit full colony details (Name, Circle, Ward, Status, Counts)">
               <i class="fa-solid fa-pen-to-square"></i> Edit
             </button>
-          </td>
+          </td>` : ''}
         </tr>
       `;
     }).join('');
@@ -1442,6 +1462,10 @@ function doPost(e) {
   }
 
   function saveAdminCredentials(newUsername, newPassword) {
+    if (!isCurrentUserAdmin()) {
+      showToast('Access denied: Administrator credentials can only be updated by administrators.', 'error');
+      return false;
+    }
     const u = (newUsername || '').trim();
     const p = (newPassword || '').trim();
 
@@ -1602,6 +1626,7 @@ function doPost(e) {
 
     updateHeaderAuthUI();
     updateAdminAuthUI();
+    applyRoleBasedUI();
 
     showToast(`Access granted: Welcome ${sessionData.username} (${sessionData.role.toUpperCase()})!`, 'success');
 
@@ -1640,6 +1665,7 @@ function doPost(e) {
     updateCredsDisplay();
     updateHeaderAuthUI();
     updateAdminAuthUI();
+    applyRoleBasedUI();
     renderAll();
 
     showToast('Logged out of dashboard. Website locked.', 'info');
@@ -1661,6 +1687,7 @@ function doPost(e) {
           if (app) app.style.display = 'block';
           updateHeaderAuthUI();
           updateAdminAuthUI();
+          applyRoleBasedUI();
           return true;
         }
       } catch { /* parse fail */ }
@@ -1674,7 +1701,71 @@ function doPost(e) {
     updateCredsDisplay();
     updateHeaderAuthUI();
     updateAdminAuthUI();
+    applyRoleBasedUI();
     return false;
+  }
+
+  function isCurrentUserAdmin() {
+    return !!(state.isAuthenticated && state.currentUser && state.currentUser.role === 'admin');
+  }
+
+  function applyRoleBasedUI() {
+    const isAdmin = isCurrentUserAdmin();
+
+    // 1. Navigation Admin Tab
+    const adminTab = document.getElementById('adminViewTabBtn');
+    if (adminTab) {
+      adminTab.style.display = isAdmin ? '' : 'none';
+    }
+
+    // If currently on admin view and not admin, switch to overview
+    if (!isAdmin && state.activeView === 'admin') {
+      switchView('overview');
+    }
+
+    // 2. Overview Quick Go Admin button
+    const btnQuickAdmin = document.getElementById('btnQuickGoAdmin');
+    if (btnQuickAdmin) {
+      btnQuickAdmin.style.display = isAdmin ? '' : 'none';
+    }
+
+    // 3. Colonies Directory "Add New Colony" button
+    const btnAddDir = document.getElementById('btnAddNewColonyFromDirectory');
+    if (btnAddDir) {
+      btnAddDir.style.display = isAdmin ? '' : 'none';
+    }
+
+    // 4. Reset Workspace button (admin only)
+    const btnReset = document.getElementById('btnResetWorkspace');
+    if (btnReset) {
+      btnReset.style.display = isAdmin ? '' : 'none';
+    }
+
+    // 5. Table Action column headers
+    const coloniesActionTh = document.getElementById('coloniesDirActionTh');
+    if (coloniesActionTh) {
+      coloniesActionTh.style.display = isAdmin ? '' : 'none';
+    }
+    const dateActionTh = document.getElementById('dateTableActionTh');
+    if (dateActionTh) {
+      dateActionTh.style.display = isAdmin ? '' : 'none';
+    }
+    const circleActionTh = document.getElementById('circleDrilldownActionTh');
+    if (circleActionTh) {
+      circleActionTh.style.display = isAdmin ? '' : 'none';
+    }
+
+    // 6. Descriptive texts
+    const dirSub = document.getElementById('coloniesDirSubTitle');
+    if (dirSub) {
+      dirSub.innerHTML = isAdmin
+        ? 'Live Google Sheets (COLONIES) &bull; Search, filter, and edit full details for any colony record'
+        : 'Live Google Sheets (COLONIES) &bull; Search, filter, and explore colony records (View-Only)';
+    }
+    const tabSub = document.getElementById('coloniesViewTabSub');
+    if (tabSub) {
+      tabSub.textContent = isAdmin ? 'All colonies directory & edit' : 'All colonies directory & analytics';
+    }
   }
 
   function updateHeaderAuthUI() {
@@ -1693,7 +1784,7 @@ function doPost(e) {
       } else {
         badge.className = 'header-user-badge user-badge';
         if (icon) icon.className = 'fa-solid fa-user-check';
-        if (label) label.textContent = `${state.currentUser.username} (Viewer)`;
+        if (label) label.textContent = `${state.currentUser.username} (User - View Only)`;
       }
     } else {
       badge.style.display = 'none';
@@ -1833,6 +1924,10 @@ function doPost(e) {
   }
 
   async function handleAdminRowSave(tr, btn) {
+    if (!isCurrentUserAdmin()) {
+      showToast('Access denied: Colony editing is restricted to administrators only.', 'error');
+      return;
+    }
     const rowId = tr.getAttribute('data-row');
     const record = state.allColonies.find((r) => String(r.row) === String(rowId));
     if (!record) return;
@@ -1901,6 +1996,11 @@ function doPost(e) {
       return;
     }
 
+    if (!isCurrentUserAdmin()) {
+      showToast('Access denied: Colony editing is restricted to administrators only.', 'error');
+      return;
+    }
+
     const record = state.allColonies.find((r) => String(r.row) === String(rowId));
     if (!record) {
       showToast('Colony record not found.', 'error');
@@ -1929,6 +2029,10 @@ function doPost(e) {
 
   async function handleSaveEditedColony(e) {
     e.preventDefault();
+    if (!isCurrentUserAdmin()) {
+      showToast('Access denied: Colony editing is restricted to administrators only.', 'error');
+      return;
+    }
     const rowId = document.getElementById('editRowId').value;
     const record = state.allColonies.find((r) => String(r.row) === String(rowId));
     if (!record) {
@@ -1997,6 +2101,10 @@ function doPost(e) {
       showToast('Please sign in to delete colonies.', 'warn');
       return;
     }
+    if (!isCurrentUserAdmin()) {
+      showToast('Access denied: Colony deletion is restricted to administrators only.', 'error');
+      return;
+    }
 
     const record = state.allColonies.find((r) => String(r.row) === String(rowId));
     if (!record) return;
@@ -2027,6 +2135,10 @@ function doPost(e) {
   }
 
   async function handlePushPendingAll() {
+    if (!isCurrentUserAdmin()) {
+      showToast('Access denied: Pushing edits is restricted to administrators only.', 'error');
+      return;
+    }
     const entries = Object.values(state.pendingEdits);
     if (!entries.length) return;
 
@@ -2070,6 +2182,10 @@ function doPost(e) {
      ========================================================================== */
 
   function switchView(viewName) {
+    if (viewName === 'admin' && !isCurrentUserAdmin()) {
+      showToast('Access denied: Admin & QC Work is restricted to administrators only.', 'warn');
+      return;
+    }
     state.activeView = viewName;
     document.querySelectorAll('.view-tab-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.getAttribute('data-view') === viewName);
@@ -2169,13 +2285,23 @@ function doPost(e) {
       btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
     });
 
-    document.getElementById('btnQuickGoAdmin').addEventListener('click', () => switchView('admin'));
+    document.getElementById('btnQuickGoAdmin').addEventListener('click', () => {
+      if (!isCurrentUserAdmin()) {
+        showToast('Access denied: Admin status manager is restricted to administrators only.', 'warn');
+        return;
+      }
+      switchView('admin');
+    });
 
     // Management Tools
     document.getElementById('btnRefreshData').addEventListener('click', () => fetchLiveSheetData(false));
     const btnResetWs = document.getElementById('btnResetWorkspace');
     if (btnResetWs) {
       btnResetWs.addEventListener('click', () => {
+        if (!isCurrentUserAdmin()) {
+          showToast('Access denied: Resetting workspace is restricted to administrators only.', 'error');
+          return;
+        }
         if (!confirm('Reset dashboard workspace back to original Google Sheet dataset? All local edits will be reset.')) return;
         localStorage.removeItem(CONFIG.storageKeys.workspaceData);
         localStorage.removeItem(CONFIG.storageKeys.pendingEdits);
@@ -2253,6 +2379,10 @@ function doPost(e) {
           showToast('Please sign in to add new colonies.', 'warn');
           const gate = document.getElementById('globalAuthGate');
           if (gate) gate.style.display = 'flex';
+          return;
+        }
+        if (!isCurrentUserAdmin()) {
+          showToast('Access denied: Adding new colonies is restricted to administrators only.', 'error');
           return;
         }
         document.getElementById('newDate').value = new Date().toISOString().slice(0, 10);
@@ -2348,7 +2478,7 @@ function doPost(e) {
         tabAdmin.classList.remove('active');
         if (roleBadge) {
           roleBadge.className = 'portal-badge-pill user-mode';
-          roleBadgeText.textContent = 'USER ACCESS • ANALYTICS & COLONY VIEWER';
+          roleBadgeText.textContent = 'USER ACCESS • VIEW-ONLY (EDIT RESTRICTED TO ADMIN)';
         }
         if (portalUserField) portalUserField.value = '';
         if (portalPassField) {
@@ -2507,12 +2637,20 @@ function doPost(e) {
     });
 
     document.getElementById('btnOpenAddColony').addEventListener('click', () => {
+      if (!isCurrentUserAdmin()) {
+        showToast('Access denied: Adding colonies is restricted to administrators only.', 'error');
+        return;
+      }
       document.getElementById('newDate').value = new Date().toISOString().slice(0, 10);
       document.getElementById('addColonyModal').classList.add('open');
     });
 
     document.getElementById('addColonyForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (!isCurrentUserAdmin()) {
+        showToast('Access denied: Adding colonies is restricted to administrators only.', 'error');
+        return;
+      }
       const submitBtn = document.getElementById('btnSubmitNewColony');
       submitBtn.disabled = true;
       submitBtn.textContent = 'Saving...';
@@ -2701,6 +2839,10 @@ function doPost(e) {
       const editBtn = e.target.closest('.js-open-edit');
       if (editBtn) {
         e.preventDefault();
+        if (!isCurrentUserAdmin()) {
+          showToast('Access denied: Colony editing is restricted to administrators only.', 'warn');
+          return;
+        }
         const rowId = editBtn.getAttribute('data-row');
         if (rowId) openEditColonyModal(rowId);
       }

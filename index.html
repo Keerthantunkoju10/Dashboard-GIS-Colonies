@@ -204,7 +204,7 @@
         <span class="view-tab-icon"><i class="fa-solid fa-house-laptop"></i></span>
         <span class="view-tab-text">
           <span class="view-tab-title">Full Colony Details</span>
-          <span class="view-tab-sub">All colonies directory &amp; edit</span>
+          <span class="view-tab-sub" id="coloniesViewTabSub">All colonies directory &amp; edit</span>
         </span>
       </button>
 
@@ -442,7 +442,7 @@
         <div class="panel-header" style="flex-wrap: wrap; gap: 12px;">
           <div>
             <h3><i class="fa-solid fa-house-laptop" style="color: #2563eb; margin-right: 6px;"></i> Full Colony Details &amp; Performance Directory</h3>
-            <p style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+            <p style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;" id="coloniesDirSubTitle">
               Live Google Sheets (COLONIES) &bull; Search, filter, and edit full details for any colony record
             </p>
           </div>
@@ -490,7 +490,7 @@
                 <th class="sortable num" data-sort-dir="dashboardCount">Dashboard Count &#8597;</th>
                 <th class="sortable num" data-sort-dir="finalCount">Finalized Count &#8597;</th>
                 <th>Reason / Remarks</th>
-                <th class="center" style="min-width: 110px;">Action</th>
+                <th class="center" style="min-width: 110px;" id="coloniesDirActionTh">Action</th>
               </tr>
             </thead>
             <tbody id="coloniesDirectoryBody"></tbody>
@@ -590,7 +590,7 @@
                 <th class="num">Dashboard Count</th>
                 <th class="num">Finalized Count</th>
                 <th>Reason / Remarks</th>
-                <th class="center">Action</th>
+                <th class="center" id="dateTableActionTh">Action</th>
               </tr>
             </thead>
             <tbody id="dateTableBody"></tbody>
@@ -650,7 +650,7 @@
                   <th class="num">Dashboard</th>
                   <th class="num">Finalized</th>
                   <th>Reason</th>
-                  <th class="center">Action</th>
+                  <th class="center" id="circleDrilldownActionTh">Action</th>
                 </tr>
               </thead>
               <tbody id="circleDrilldownBody"></tbody>
