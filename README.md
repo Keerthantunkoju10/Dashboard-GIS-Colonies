@@ -2,7 +2,7 @@
 
 Live executive colony analytics dashboard & Excel-linked Admin Suite built for **NeoGeoinfo Technologies Limited (GHMC Project)**, directly integrated with the Google Sheet:
 
-- **Linked Google Sheet**: `https://docs.google.com/spreadsheets/d/1IrHCi97oTceUR7Bi_k-IPVrrNOUaW6npVDreGI1slfE/edit?usp=sharing`
+- **Linked Google Sheet**: `************`
 - **Active Sheet Tab**: `COLONIES`
 - **Employee-free Analytics**: Focuses exclusively on **Colonies, Circles, Wards, Property Counts, and Statuses** (`COMPLETED`, `PROGRESS`, `HOLD`, `REJECTED`).
 
@@ -24,7 +24,7 @@ Live executive colony analytics dashboard & Excel-linked Admin Suite built for *
    - **Admin Username & Password Update**:
      - Fast modal access via **Update Admin Credentials** button in the Admin top bar to update both the master Admin username and password (with current password verification).
      - Dedicated **Admin Security & Theme** tab in the Admin suite for credentials management, credential reset to defaults, and active security oversight.
-   - **Default credentials**: `admin` / `admin123` (or User viewer: `user` / `user123`), fully customizable.
+   - **Default credentials**: `************` / `************123` (or User viewer: `user` / `user123`), fully customizable.
    - Public dashboard remains protected behind secure authentication gate until sign-in.
    - **6 pastel summary cards** (`Total Records`, `Finalized Count`, `Completed`, `In Progress`, `Hold`, `Rejected / No Final`).
    - **Full inline-editable table** of every row in Google Sheets (`COLONIES`): update **Status**, **Dashboard Count**, **Finalized Count**, **Alloted Date**, or **Reason** and click **Save** to update BOTH the Google Sheet and the Dashboard immediately.
@@ -77,7 +77,7 @@ To also push **Admin Dashboard status/count edits BACK into Google Sheets** (60-
      - Key: `GOOGLE_APPS_SCRIPT_URL`
      - Value: `https://script.google.com/macros/s/.../exec`
      - Trigger a quick redeploy.
-   - **Instant (In Browser)**: Sign into **Admin / QC Work** (`admin` / `admin123`) → open **Excel 2-Way Sync Setup** → paste the Web App URL → click **Test & Connect**.
+   - **Instant (In Browser)**: Sign into **Admin / QC Work** (`************` / `************123`) → open **Excel 2-Way Sync Setup** → paste the Web App URL → click **Test & Connect**.
 
 Now:
 - **Edit a status in Google Sheets** → Dashboard & Admin Dashboard reflect it automatically (on Refresh or within 30 seconds).
@@ -95,8 +95,8 @@ The project includes serverless authentication powered by Netlify Environment Va
 The project includes a `.env` file (and `.env.example` template):
 ```env
 # Administrator Login Credentials (Used for secure Netlify Admin login)
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin123
+ADMIN_USERNAME=************
+ADMIN_PASSWORD=************123
 
 # Standard User Login Credentials
 USER_USERNAME=user
