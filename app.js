@@ -790,10 +790,35 @@ function doPost(e) {
     applyRoleBasedUI();
   }
 
+  function animateNumber(el, targetNumber, duration = 400) {
+    if (!el) return;
+    const target = Math.round(Number(targetNumber) || 0);
+    const startVal = el._animatedVal !== undefined ? el._animatedVal : 0;
+    if (startVal === target) {
+      el.textContent = formatIndianNumber(target);
+      return;
+    }
+    const startTime = performance.now();
+    function step(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(startVal + (target - startVal) * ease);
+      el.textContent = formatIndianNumber(current);
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        el.textContent = formatIndianNumber(target);
+        el._animatedVal = target;
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
   function renderPrimaryTabCounts() {
-    document.getElementById('countFresh').textContent = filterBySource(state.allColonies, 'fresh').length;
-    document.getElementById('countResubmit').textContent = filterBySource(state.allColonies, 'resubmit').length;
-    document.getElementById('countLayers').textContent = filterBySource(state.allColonies, 'layers').length;
+    animateNumber(document.getElementById('countFresh'), filterBySource(state.allColonies, 'fresh').length);
+    animateNumber(document.getElementById('countResubmit'), filterBySource(state.allColonies, 'resubmit').length);
+    animateNumber(document.getElementById('countLayers'), filterBySource(state.allColonies, 'layers').length);
   }
 
   function renderExecutiveKPIs() {
@@ -806,13 +831,13 @@ function doPost(e) {
     const validDates = records.map((r) => r.date).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
     const lastDate = validDates.length ? validDates[validDates.length - 1] : '';
 
-    document.getElementById('kpiTotalProps').textContent = formatIndianNumber(totalDash);
+    animateNumber(document.getElementById('kpiTotalProps'), totalDash);
     document.getElementById('kpiTotalPropsSub').textContent = `Across ${formatIndianNumber(records.length)} colony records`;
-    document.getElementById('kpiFinalProps').textContent = formatIndianNumber(totalFinal);
+    animateNumber(document.getElementById('kpiFinalProps'), totalFinal);
     const pct = totalDash > 0 ? ((totalFinal / totalDash) * 100).toFixed(1) : '0.0';
     document.getElementById('kpiFinalPropsSub').textContent = `${pct}% of dashboard target verified`;
     document.getElementById('kpiLastDate').textContent = formatDisplayDate(lastDate);
-    document.getElementById('kpiCompletedColonies').textContent = formatIndianNumber(completedRows.length);
+    animateNumber(document.getElementById('kpiCompletedColonies'), completedRows.length);
     document.getElementById('kpiCompletedSub').textContent = `${formatIndianNumber(completedFinalProps)} finalized properties verified`;
   }
 
@@ -890,13 +915,13 @@ function doPost(e) {
       <span class="summary-chip amber"><i class="fa-solid fa-pause"></i> Hold: ${holdCount + rejectedCount}</span>
     `;
 
-    document.getElementById('mkTarget').textContent = formatIndianNumber(totalDash);
-    document.getElementById('mkFinalized').textContent = formatIndianNumber(totalFinal);
-    document.getElementById('mkCircles').textContent = formatIndianNumber(circles.size);
-    document.getElementById('mkDays').textContent = formatIndianNumber(uniqueDays);
-    document.getElementById('mkCompleted').textContent = formatIndianNumber(completedCount);
+    animateNumber(document.getElementById('mkTarget'), totalDash);
+    animateNumber(document.getElementById('mkFinalized'), totalFinal);
+    animateNumber(document.getElementById('mkCircles'), circles.size);
+    animateNumber(document.getElementById('mkDays'), uniqueDays);
+    animateNumber(document.getElementById('mkCompleted'), completedCount);
     document.getElementById('mkAchievement').textContent = `${overallAch}%`;
-    document.getElementById('mkPending').textContent = formatIndianNumber(holdCount + progressCount + rejectedCount);
+    animateNumber(document.getElementById('mkPending'), holdCount + progressCount + rejectedCount);
     document.getElementById('mkTaskCompletion').textContent = `${taskComp}%`;
     document.getElementById('mkTaskProgressBar').style.width = `${Math.min(100, Number(taskComp))}%`;
 
@@ -1870,12 +1895,12 @@ function doPost(e) {
     const holdCount = filtered.filter((r) => (r.status || '').toUpperCase() === 'HOLD').length;
     const noFinalCount = filtered.filter((r) => (r.status || '').toUpperCase() === 'REJECTED' || !(Number(r.finalCount) > 0)).length;
 
-    document.getElementById('adminStatTotal').textContent = formatIndianNumber(filtered.length);
-    document.getElementById('adminStatFinalized').textContent = formatIndianNumber(totalFinal);
-    document.getElementById('adminStatCompleted').textContent = formatIndianNumber(completedCount);
-    document.getElementById('adminStatProgress').textContent = formatIndianNumber(progressCount);
-    document.getElementById('adminStatHold').textContent = formatIndianNumber(holdCount);
-    document.getElementById('adminStatNoFinal').textContent = formatIndianNumber(noFinalCount);
+    animateNumber(document.getElementById('adminStatTotal'), filtered.length);
+    animateNumber(document.getElementById('adminStatFinalized'), totalFinal);
+    animateNumber(document.getElementById('adminStatCompleted'), completedCount);
+    animateNumber(document.getElementById('adminStatProgress'), progressCount);
+    animateNumber(document.getElementById('adminStatHold'), holdCount);
+    animateNumber(document.getElementById('adminStatNoFinal'), noFinalCount);
 
     document.getElementById('adminTableCountInfo').textContent = `Showing ${filtered.length} of ${all.length} Google Sheet records (COLONIES)`;
 
@@ -2191,7 +2216,13 @@ function doPost(e) {
       btn.classList.toggle('active', btn.getAttribute('data-view') === viewName);
     });
     document.querySelectorAll('.view-section').forEach((sec) => {
-      sec.classList.toggle('active', sec.id === `view-${viewName}`);
+      const isActive = sec.id === `view-${viewName}`;
+      sec.classList.toggle('active', isActive);
+      if (isActive) {
+        sec.style.animation = 'none';
+        void sec.offsetWidth;
+        sec.style.animation = '';
+      }
     });
     if (viewName === 'colonies') renderColoniesDirectory();
     if (viewName === 'circle') renderCircleWise();
@@ -2206,6 +2237,13 @@ function doPost(e) {
     const subColonies = document.getElementById('adminSubColonies');
     const subSync = document.getElementById('adminSubSync');
     const subAuth = document.getElementById('adminSubAuth');
+    [subColonies, subSync, subAuth].forEach((el) => {
+      if (el) {
+        el.style.animation = 'none';
+        void el.offsetWidth;
+        el.style.animation = '';
+      }
+    });
     if (subColonies) subColonies.style.display = tabName === 'colonies' ? 'block' : 'none';
     if (subSync) subSync.style.display = tabName === 'sync' ? 'block' : 'none';
     if (subAuth) subAuth.style.display = tabName === 'auth' ? 'block' : 'none';
@@ -2865,6 +2903,20 @@ function doPost(e) {
   }
 
   function init() {
+    if (typeof Chart !== 'undefined') {
+      Chart.defaults.animation = {
+        duration: 550,
+        easing: 'easeOutQuart'
+      };
+      Chart.defaults.transitions = {
+        active: {
+          animation: {
+            duration: 250
+          }
+        }
+      };
+    }
+
     document.getElementById('appsScriptPreview').textContent = APPS_SCRIPT_SNIPPET;
 
     const hasSession = restoreAdminSession();
