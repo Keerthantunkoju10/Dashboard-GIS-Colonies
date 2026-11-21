@@ -5,3 +5,6 @@ test_e2e.py
 .DS_Store
 Thumbs.db
 .netlify/
+node_modules/
+.env
+.env.local

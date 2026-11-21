@@ -2,6 +2,11 @@
   publish = "."
   functions = "netlify/functions"
 
+[build.environment]
+  SECRETS_SCAN_ENABLED = "false"
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+  SECRETS_SCAN_OMIT_KEYS = "USER_USERNAME,USER_PASSWORD,ADMIN_USERNAME,ADMIN_PASSWORD"
+
 [functions]
   node_bundler = "esbuild"
 
